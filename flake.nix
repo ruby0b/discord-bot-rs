@@ -68,6 +68,7 @@
               wantedBy = if cfg.autostart then [ "multi-user.target" ] else [ ];
               after = [ "network-online.target" ];
               wants = [ "network-online.target" ];
+              environment = { DISCORD_TOKEN = cfg.token; };
               serviceConfig = {
                 ExecStart = "${pkgs.lib.getExe pkgs.${name}}";
                 WorkingDirectory = "/var/lib/${name}";
