@@ -1,6 +1,6 @@
-use anyhow::Result;
 use bot_core::{EvtContext, OptionExt as _, State, VoiceChange, With};
 use dashmap::DashMap;
+use eyre::Result;
 use itertools::Itertools;
 use poise::serenity_prelude::all::{
     Builder, ChannelId, ChannelType, CreateChannel, GuildChannel, GuildId, VoiceState,

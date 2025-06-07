@@ -1,5 +1,5 @@
-use anyhow::Error;
 use bot_core::CmdContext;
+use eyre::Error;
 use poise::serenity_prelude::{Colour, CreateEmbed};
 use poise::{CreateReply, FrameworkError, serenity_prelude as serenity};
 
@@ -15,7 +15,7 @@ pub async fn on_error<D>(error: FrameworkError<'_, D, Error>) {
             }
             FrameworkError::Command { error, ctx, .. } => {
                 tracing::error!("Error in /{}: {error:?}", ctx.command().name);
-                reply_error(ctx, format!("Error: {error:#}")).await?;
+                reply_error(ctx, format!("```\n{error:#}\n```")).await?;
             }
             FrameworkError::ArgumentParse { ctx, input, error, .. } => {
                 tracing::warn!("Error parsing arguments: {error:?}");
@@ -27,7 +27,7 @@ pub async fn on_error<D>(error: FrameworkError<'_, D, Error>) {
                 poise::builtins::on_error(error).await?;
             }
         };
-        anyhow::Ok(())
+        eyre::Ok(())
     }
     .await
     {

@@ -1,6 +1,6 @@
-use anyhow::Result;
 use bot_core::With;
 use derive_more::{AsMut, AsRef};
+use eyre::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

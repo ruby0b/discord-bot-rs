@@ -16,13 +16,14 @@ members = [
 version = "0.1.0"
 
 [workspace.dependencies]
-anyhow = { version = "1.0.89", features = ["backtrace"] }
 async-trait = "0.1.88"
 chrono = { version = "0.4.40", features = ["serde"] }
+color-eyre = "0.6.5"
 dashmap = "6.1.0"
 derive_more = { version = "2.0.1", features = ["full"] }
 dotenv = "0.15.0"
 emojis = "0.6.4"
+eyre = "0.6.12"
 fancy-regex = "0.14.0"
 filetime = "0.2.23"
 futures = "0.3.30"
@@ -60,3 +61,6 @@ uuid = { version = "1.14.0", features = ["v4", "fast-rng", "serde"] }
 [workspace.lints.clippy]
 get_first = "allow"
 let_and_return = "allow"
+
+[profile.dev.package.backtrace]
+opt-level = 3

@@ -7,9 +7,9 @@ edition = "2024"
 path = "lib.rs"
 
 [dependencies]
-anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
+eyre.workspace = true
 fancy-regex.workspace = true
 filetime.workspace = true
 hex.workspace = true

@@ -7,8 +7,8 @@ edition = "2024"
 path = "lib.rs"
 
 [dependencies]
-anyhow.workspace = true
 bot_core.path = "../bot_core"
+eyre.workspace = true
 poise.workspace = true
 serde.workspace = true
 tracing.workspace = true

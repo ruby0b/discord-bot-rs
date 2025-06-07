@@ -1,4 +1,4 @@
-use anyhow::{Context as _, Result};
+use eyre::{Result, WrapErr as _};
 use filetime::{FileTime, set_file_mtime};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -46,7 +46,7 @@ async fn create_dir(path: &Path) -> Result<()> {
     if let Err(e) = fs::create_dir_all(path).await
         && e.kind() != io::ErrorKind::AlreadyExists
     {
-        return Err(e).context("Failed to create directory");
+        return Err(e).wrap_err("Failed to create directory");
     }
     Ok(())
 }

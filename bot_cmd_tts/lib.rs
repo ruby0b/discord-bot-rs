@@ -3,11 +3,11 @@
 
 mod tts;
 
-use anyhow::{Context as _, Result, bail};
 use bot_core::audio::{Playable, play};
 use bot_core::serde::LiteralRegex;
 use bot_core::{EvtContext, OptionExt as _, State, VoiceChange, With, hash_store, template};
 use dashmap::DashMap;
+use eyre::{OptionExt as _, Result, bail};
 use itertools::Itertools;
 use poise::serenity_prelude::{CacheHttp, ChannelId, GuildId, Presence, UserId, VoiceState};
 use rand::seq::IteratorRandom as _;
@@ -85,7 +85,7 @@ pub async fn presence_update(
     ctx: EvtContext<'_, impl UserDataT>,
     presence: &Presence,
 ) -> Result<()> {
-    let guild_id = presence.guild_id.context("No guild ID")?;
+    let guild_id = presence.guild_id.ok_or_eyre("No guild ID")?;
     let vc_id = {
         let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
         let Some(voice_state) = guild.voice_states.get(&presence.user.id) else { return Ok(()) };
@@ -129,7 +129,7 @@ async fn play_tts(
     config: &Tts,
     cooldown_id: CooldownId,
 ) -> Result<bool> {
-    let new_time = || Instant::now().checked_add(config.cooldown).context("Instant overflow");
+    let new_time = || Instant::now().checked_add(config.cooldown).ok_or_eyre("Instant overflow");
     let state: Arc<StateT> = ctx.user_data.state();
     match state.cooldowns.entry(cooldown_id.clone()) {
         dashmap::Entry::Occupied(entry) => {
@@ -205,7 +205,7 @@ async fn template_to_audio(
         extend_audio(&mut audio, tts::get_tts(&text_buffer).await?);
     }
 
-    audio.context("Empty audio")
+    audio.ok_or_eyre("Empty audio")
 }
 
 fn extend_audio(audio_1: &mut Option<Playable>, audio_2: Playable) {

@@ -1,7 +1,7 @@
 use crate::message_file::MessageFile;
 use crate::util::{code_block_or_file, diff};
-use anyhow::{Context as _, Result, ensure};
 use bot_core::{CmdContext, OptionExt as _, State};
+use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use poise::serenity_prelude::{
     Builder, Cache, CacheHttp, ChannelId, CreateAttachment, CreateAutocompleteResponse,
     CreateInputText, CreateInteractionResponse, CreateInteractionResponseFollowup,
@@ -113,14 +113,14 @@ impl<DataT: ConfigDataT> Config<DataT> {
 
     pub async fn with<T>(&self, f: impl FnOnce(&DataT) -> Result<T>) -> Result<T> {
         let config = self.0.read().await;
-        let config = config.as_ref().context("Uninitialized config")?;
+        let config = config.as_ref().ok_or_eyre("Uninitialized config")?;
 
         f(&config.cache)
     }
 
     pub async fn with_mut<T>(&self, f: impl FnOnce(&mut DataT) -> Result<T>) -> Result<T> {
         let mut config = self.0.write().await;
-        let config = config.as_mut().context("Uninitialized config")?;
+        let config = config.as_mut().ok_or_eyre("Uninitialized config")?;
 
         config.dirty = true;
         f(&mut config.cache)
@@ -146,7 +146,7 @@ impl<DataT: ConfigDataT> Config<DataT> {
 
     async fn write_if_dirty(&self, http: &impl CacheHttp) -> Result<bool> {
         let mut config = self.0.write().await;
-        let config = config.as_mut().context("Uninitialized config")?;
+        let config = config.as_mut().ok_or_eyre("Uninitialized config")?;
 
         if config.dirty {
             config.file.write(http, to_yaml_string(&config.cache)?).await?;
@@ -199,7 +199,7 @@ pub async fn config<D: State<Config<impl ConfigDataT>>>(
 
     let root = ctx.data().state().with(|cfg| to_yaml_value(cfg)).await?;
     let root_str = to_yaml_string(&root)?;
-    let value = autocomplete_yaml::get_path(&root, path.split('.')).context("Invalid path")?;
+    let value = autocomplete_yaml::get_path(&root, path.split('.')).ok_or_eyre("Invalid path")?;
     let value_str = to_yaml_string(&value)?;
 
     let Some(int) = match operation {
@@ -226,9 +226,9 @@ pub async fn config<D: State<Config<impl ConfigDataT>>>(
                 &app.interaction.token,
                 CreateQuickModal::new("Append").paragraph_field("Value"),
                 |root, inputs| {
-                    let value = from_yaml_str(inputs.get(0).some()?).context("Invalid value")?;
+                    let value = from_yaml_str(inputs.get(0).some()?).wrap_err("Invalid value")?;
                     autocomplete_yaml::append_path(root, path.split("."), value)
-                        .context("Path has become invalid")
+                        .ok_or_eyre("Path has become invalid")
                 },
             )
             .await
@@ -242,9 +242,9 @@ pub async fn config<D: State<Config<impl ConfigDataT>>>(
                 CreateQuickModal::new("Insert").short_field("Key").paragraph_field("Value"),
                 |root, inputs| {
                     let key = inputs.get(0).some()?;
-                    let value = from_yaml_str(inputs.get(1).some()?).context("Invalid value")?;
+                    let value = from_yaml_str(inputs.get(1).some()?).wrap_err("Invalid value")?;
                     autocomplete_yaml::insert_path(root, path.split("."), key, value)
-                        .context("Path has become invalid")
+                        .ok_or_eyre("Path has become invalid")
                 },
             )
             .await
@@ -258,9 +258,9 @@ pub async fn config<D: State<Config<impl ConfigDataT>>>(
                     CreateInputText::new(InputTextStyle::Paragraph, "Value", "").value(value_str),
                 ),
                 |root, inputs| {
-                    let value = from_yaml_str(inputs.get(0).some()?).context("Invalid value")?;
+                    let value = from_yaml_str(inputs.get(0).some()?).wrap_err("Invalid value")?;
                     autocomplete_yaml::set_path(root, path.split("."), value)
-                        .context("Path has become invalid")?;
+                        .ok_or_eyre("Path has become invalid")?;
                     Ok(())
                 },
             )
@@ -331,7 +331,7 @@ pub async fn restore<D: State<Config<impl ConfigDataT>>>(ctx: CmdContext<'_, D>)
         .msg
         .attachments
         .first()
-        .context("You have to upload the backup alongside the command")?;
+        .ok_or_eyre("You have to upload the backup alongside the command")?;
 
     let bytes = attachment.download().await?;
     let new = from_yaml_str(&String::from_utf8_lossy(&bytes))?;

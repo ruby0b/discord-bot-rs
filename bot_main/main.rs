@@ -9,8 +9,8 @@ mod log;
 mod message_file;
 mod util;
 
-use anyhow::{Context, Result};
 use bot_core::OptionExt as _;
+use eyre::{Result, WrapErr as _};
 use poise::serenity_prelude::{
     ChannelId, Client, FullEvent, GatewayIntents, GuildId, Interaction, Settings,
 };
@@ -19,18 +19,19 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    crate::log::init_logging();
+    crate::log::init_tracing();
+    unsafe { crate::log::init_eyre()? }
 
     // Read required config from environment variables (or .env file)
-    let config_url = dotenv::var("BOT_CONFIG_CHANNEL").context("BOT_CONFIG_CHANNEL not set")?;
-    let token = dotenv::var("BOT_TOKEN").context("BOT_TOKEN not set")?;
+    let config_url = dotenv::var("BOT_CONFIG_CHANNEL").wrap_err("BOT_CONFIG_CHANNEL not set")?;
+    let token = dotenv::var("BOT_TOKEN").wrap_err("BOT_TOKEN not set")?;
 
     let (cfg_guild, cfg_channel): (GuildId, ChannelId) = (|| -> Result<_> {
         let url = url::Url::parse(&config_url)?;
         let mut segments = url.path_segments().some()?.skip(1);
         Ok((segments.next().some()?.parse()?, segments.next().some()?.parse()?))
     })()
-    .context("Config URL must be a channel link")?;
+    .wrap_err("Config URL must be a channel link")?;
 
     let options = poise::FrameworkOptions {
         commands: vec![
@@ -153,8 +154,8 @@ async fn main() -> Result<()> {
         .cache_settings(Settings::default())
         .register_songbird()
         .await
-        .context("Err creating client")?
+        .wrap_err("Err creating client")?
         .start()
         .await
-        .context("Client error")
+        .wrap_err("Client error")
 }

@@ -1,8 +1,8 @@
 mod sandbox;
 
 use crate::sandbox::run_in_sandbox;
-use anyhow::Result;
 use bot_core::{CmdContext, UserData};
+use eyre::Result;
 use poise::CreateReply;
 use poise::serenity_prelude::all::CreateAttachment;
 

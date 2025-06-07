@@ -8,7 +8,7 @@ pub async fn voice_region<U, E>(
 ) -> CreateAutocompleteResponse {
     async {
         let regions = ctx.http().get_guild_regions(ctx.guild_id().unwrap()).await?;
-        anyhow::Ok(CreateAutocompleteResponse::new().set_choices(
+        eyre::Ok(CreateAutocompleteResponse::new().set_choices(
             regions.into_iter().map(|r| AutocompleteChoice::new(r.name, r.id)).take(25).collect(),
         ))
     }

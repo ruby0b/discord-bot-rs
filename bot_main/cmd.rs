@@ -1,5 +1,5 @@
-use anyhow::{Context, Result, bail};
 use bot_core::{CmdContext, UserData};
+use eyre::{OptionExt as _, Result, bail};
 use poise::serenity_prelude::ReactionType;
 
 /// Manage slash commands
@@ -12,7 +12,7 @@ pub async fn register<D: UserData>(ctx: CmdContext<'_, D>) -> Result<()> {
 /// Unregister and re-register all guild commands
 #[poise::command(prefix_command, owners_only, aliases("rr"))]
 pub async fn reregister<D: UserData>(ctx: CmdContext<'_, D>) -> Result<()> {
-    let guild_id = ctx.guild_id().context("Must be called in guild")?;
+    let guild_id = ctx.guild_id().ok_or_eyre("Must be called in guild")?;
     let create_commands =
         poise::builtins::create_application_commands(&ctx.framework().options().commands);
 

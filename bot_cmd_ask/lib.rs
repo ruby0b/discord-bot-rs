@@ -1,10 +1,10 @@
 #![feature(btree_extract_if)]
 #![allow(clippy::mutable_key_type)]
 
-use anyhow::{Context as _, Result};
 use bot_core::serde::LiteralRegex;
 use bot_core::{CmdContext, EvtContext, With};
 use chrono::{DateTime, Local, NaiveDateTime, TimeDelta, TimeZone as _, Utc};
+use eyre::{OptionExt as _, Result, WrapErr as _};
 use fancy_regex::Regex;
 use itertools::Itertools;
 use poise::serenity_prelude::{
@@ -369,7 +369,7 @@ async fn update_ask_message(
 
     let (channel_id, edit, ping) = data
         .with_mut(|cfg| {
-            let ask = cfg.asks.get_mut(&msg_id).context("Can't update missing ask")?;
+            let ask = cfg.asks.get_mut(&msg_id).ok_or_eyre("Can't update missing ask")?;
             Ok((ask.channel_id, ask.edit_message(), ask.ping(msg_id)))
         })
         .await?;
@@ -392,7 +392,7 @@ async fn disable_ask_message(
 
     let (channel_id, edit, embed) = data
         .with_mut(|cfg| {
-            let ask = cfg.asks.remove(&msg_id).context("Can't remove missing ask")?;
+            let ask = cfg.asks.remove(&msg_id).ok_or_eyre("Can't remove missing ask")?;
             Ok((ask.channel_id, ask.edit_message(), ask.embed()))
         })
         .await?;
@@ -437,7 +437,7 @@ pub async fn button_pressed(
     let (channel_id, response, ping) = ctx
         .user_data
         .with_mut(|cfg| {
-            let ask = cfg.asks.get_mut(&component.message.id).context("unknown ask")?;
+            let ask = cfg.asks.get_mut(&component.message.id).ok_or_eyre("unknown ask")?;
             let response = match join_or_leave {
                 JoinOrLeave::Join => {
                     if ask.full() {
@@ -508,7 +508,7 @@ pub async fn new_ask_defaults<D: With<ConfigT>>(
     #[description = "(Default) Description of the game"] description: Option<String>,
     #[description = "(Default) Thumbnail of the game"] thumbnail_url: Option<String>,
 ) -> Result<()> {
-    let title_pattern = Regex::new(&format!("(?i){title_pattern}")).context("Invalid regex")?;
+    let title_pattern = Regex::new(&format!("(?i){title_pattern}")).wrap_err("Invalid regex")?;
 
     ctx.data()
         .with_mut_ok(|cfg| {

@@ -1,5 +1,5 @@
 use crate::State;
-use anyhow::{Context as _, Result};
+use eyre::{OptionExt as _, Result, WrapErr as _};
 use poise::serenity_prelude::{ChannelId, Context, GuildId};
 use songbird::input::{File, Input};
 use songbird::{Call, Event, EventContext, Songbird, TrackEvent};
@@ -59,7 +59,7 @@ pub async fn play(
 ) -> Result<()> {
     match join_play_leave(ctx, data, guild_id, channel_id, sounds)
         .await
-        .context(format!("Failed to play audio in {guild_id}/{channel_id}"))?
+        .wrap_err(format!("Failed to play audio in {guild_id}/{channel_id}"))?
     {
         Busyness::Success => tracing::info!("Played audio in {}/{}", guild_id, channel_id),
         Busyness::Busy => {}
@@ -82,7 +82,7 @@ pub async fn join_play_leave(
     let state = data.state();
     let Ok(_lock) = state.lock.try_lock() else { return Ok(Busyness::Busy) };
 
-    let manager = songbird::get(ctx).await.context("Songbird voice client not initialized")?;
+    let manager = songbird::get(ctx).await.ok_or_eyre("Songbird voice client not initialized")?;
     match manager.join(guild_id, channel_id).await {
         Ok(handler_lock) => {
             let mut handler = handler_lock.lock().await;

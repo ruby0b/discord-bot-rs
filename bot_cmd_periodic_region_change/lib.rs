@@ -1,8 +1,8 @@
-use anyhow::{Context as _, Result};
-use chrono::TimeDelta;
 use bot_core::serde::LiteralRegex;
 use bot_core::{CmdContext, EvtContext, State, VoiceChange, With};
+use chrono::TimeDelta;
 use dashmap::DashMap;
+use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::all::{
     Builder, ChannelId, ChannelType, EditChannel, GuildId, UserId, VoiceState,
 };
@@ -105,10 +105,10 @@ async fn change_region(
     };
 
     let vc = {
-        let guild = guild_id.to_guild_cached(&ctx).context("uncached guild")?;
+        let guild = guild_id.to_guild_cached(&ctx).ok_or_eyre("uncached guild")?;
         let Some(voice_state) = guild.voice_states.get(&user_id) else { return Ok(()) };
         let Some(vc_id) = voice_state.channel_id else { return Ok(()) };
-        guild.channels.get(&vc_id).context("uncached channel")?.clone()
+        guild.channels.get(&vc_id).ok_or_eyre("uncached channel")?.clone()
     };
 
     if vc.id != vc_id || vc.kind != ChannelType::Voice {

@@ -1,10 +1,11 @@
+use eyre::Result;
 use itertools::Itertools as _;
 use tracing::level_filters::LevelFilter;
 use tracing_subscriber::filter::{EnvFilter, Targets};
 use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::*;
 
-pub fn init_logging() {
+pub fn init_tracing() {
     // WORKSPACE_CRATES is generated in build.rs
     let mut crates = env!("WORKSPACE_CRATES").split(',').collect::<Vec<_>>();
     crates.push(env!("CARGO_CRATE_NAME"));
@@ -28,4 +29,17 @@ pub fn init_logging() {
         ))
         .with(EnvFilter::try_from_default_env().unwrap_or(filter))
         .init();
+}
+
+pub unsafe fn init_eyre() -> Result<()> {
+    if std::env::var("RUST_LIB_BACKTRACE").is_err() {
+        unsafe { std::env::set_var("RUST_LIB_BACKTRACE", "1") }
+    }
+
+    color_eyre::config::HookBuilder::default()
+        .add_frame_filter(Box::new(move |frames| {
+            frames.retain(|frame| frame.name.as_ref().is_some_and(|f| f.starts_with("bot_")));
+        }))
+        .display_env_section(false)
+        .install()
 }

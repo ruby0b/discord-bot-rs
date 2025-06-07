@@ -8,7 +8,6 @@ name = "discord-bot-rs"
 path = "main.rs"
 
 [dependencies]
-anyhow.workspace = true
 async-trait.workspace = true
 bot_cmd_ask.path = "../bot_cmd_ask"
 bot_cmd_ephemeral_voice_channels.path = "../bot_cmd_ephemeral_voice_channels"
@@ -18,8 +17,10 @@ bot_cmd_role_icon.path = "../bot_cmd_role_icon"
 bot_cmd_roles.path = "../bot_cmd_roles"
 bot_cmd_tts.path = "../bot_cmd_tts"
 bot_core.path = "../bot_core"
+color-eyre.workspace = true
 derive_more.workspace = true
 dotenv.workspace = true
+eyre.workspace = true
 imara-diff.workspace = true
 itertools.workspace = true
 once_cell.workspace = true

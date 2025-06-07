@@ -6,12 +6,12 @@ pub mod hash_store;
 pub mod serde;
 pub mod template;
 
-use anyhow::{Context as _, Result};
+use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::{ChannelId, VoiceState};
 use std::sync::Arc;
 
-pub type EvtContext<'a, D> = poise::FrameworkContext<'a, D, anyhow::Error>;
-pub type CmdContext<'a, D> = poise::Context<'a, D, anyhow::Error>;
+pub type EvtContext<'a, D> = poise::FrameworkContext<'a, D, eyre::Error>;
+pub type CmdContext<'a, D> = poise::Context<'a, D, eyre::Error>;
 
 pub trait UserData = Send + Sync + Clone + 'static;
 
@@ -63,7 +63,7 @@ pub trait OptionExt<T> {
 
 impl<T> OptionExt<T> for Option<T> {
     fn some(self) -> Result<T> {
-        self.context("Expected Some but got None")
+        self.ok_or_eyre("Expected Some but got None")
     }
 }
 

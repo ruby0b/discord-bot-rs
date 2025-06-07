@@ -1,4 +1,4 @@
-use anyhow::{Context as _, Result, ensure};
+use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use rlimit::{Resource, setrlimit};
 use std::collections::HashMap;
 use std::process::Stdio;
@@ -26,8 +26,8 @@ pub async fn run_in_sandbox(command: &str, args: &[&str], stdin_bytes: &[u8]) ->
 
     let mut child = cmd.spawn()?;
     {
-        let mut stdin = child.stdin.take().context("Failed to open stdin")?;
-        stdin.write_all(stdin_bytes).await.context("Failed to write to stdin")?;
+        let mut stdin = child.stdin.take().ok_or_eyre("Failed to open stdin")?;
+        stdin.write_all(stdin_bytes).await.wrap_err("Failed to write to stdin")?;
     }
     let output = child.wait_with_output().await?;
 

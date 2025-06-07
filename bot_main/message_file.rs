@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::{
     Builder, CacheHttp, ChannelId, CreateAttachment, EditMessage, FormattedTimestamp, GuildId,
     Message, MessageId,
@@ -15,7 +15,7 @@ pub struct MessageFile {
 impl MessageFile {
     /// Create from an existing message with an attachment
     pub fn from_message(msg: &Message) -> Result<Self> {
-        let attachment = msg.attachments.first().context("No attachment found")?;
+        let attachment = msg.attachments.first().ok_or_eyre("No attachment found")?;
         Ok(Self {
             filename: attachment.filename.clone(),
             guild_id: msg.guild_id,
@@ -41,7 +41,7 @@ impl MessageFile {
     /// Read the message attachment
     pub async fn read(&self, http: &impl CacheHttp) -> Result<Vec<u8>> {
         let message = self.channel_id.message(http, self.message_id).await?;
-        let attachment = message.attachments.first().context("No attachment found")?;
+        let attachment = message.attachments.first().ok_or_eyre("No attachment found")?;
         Ok(attachment.download().await?)
     }
 

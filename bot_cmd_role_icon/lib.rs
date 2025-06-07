@@ -1,5 +1,5 @@
-use anyhow::Result;
 use bot_core::{EvtContext, With};
+use eyre::Result;
 use poise::serenity_prelude::{
     Builder, CreateAttachment, EditRole, Message, RoleId, UserId, parse_emoji,
 };
