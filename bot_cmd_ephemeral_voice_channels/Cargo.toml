@@ -1,0 +1,21 @@
+[package]
+name = "bot_cmd_ephemeral_voice_channels"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+bot_core.path = "../bot_core"
+dashmap.workspace = true
+itertools.workspace = true
+poise.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true
+

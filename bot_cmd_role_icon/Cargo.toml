@@ -1,0 +1,18 @@
+[package]
+name = "bot_cmd_role_icon"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+bot_core.path = "../bot_core"
+emojis.workspace = true
+poise.workspace = true
+rand.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

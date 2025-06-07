@@ -1,0 +1,37 @@
+[package]
+name = "bot_main"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "discord-bot-rs"
+path = "main.rs"
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+bot_cmd_ask.path = "../bot_cmd_ask"
+bot_cmd_ephemeral_voice_channels.path = "../bot_cmd_ephemeral_voice_channels"
+bot_cmd_eval.path = "../bot_cmd_eval"
+bot_cmd_periodic_region_change.path = "../bot_cmd_periodic_region_change"
+bot_cmd_role_icon.path = "../bot_cmd_role_icon"
+bot_cmd_roles.path = "../bot_cmd_roles"
+bot_cmd_tts.path = "../bot_cmd_tts"
+bot_core.path = "../bot_core"
+derive_more.workspace = true
+dotenv.workspace = true
+imara-diff.workspace = true
+itertools.workspace = true
+once_cell.workspace = true
+poise.workspace = true
+regex.workspace = true
+serde_yml.workspace = true
+serde.workspace = true
+songbird.workspace = true
+tokio.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
+url.workspace = true
+
+[lints]
+workspace = true

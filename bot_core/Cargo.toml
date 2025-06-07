@@ -1,0 +1,25 @@
+[package]
+name = "bot_core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+fancy-regex.workspace = true
+filetime.workspace = true
+hex.workspace = true
+itertools.workspace = true
+poise.workspace = true
+serde.workspace = true
+sha2.workspace = true
+songbird.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

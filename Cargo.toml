@@ -1,0 +1,62 @@
+[workspace]
+resolver = "3"
+members = [
+    "bot_core",
+    "bot_cmd_ask",
+    "bot_cmd_ephemeral_voice_channels",
+    "bot_cmd_eval",
+    "bot_cmd_roles",
+    "bot_cmd_periodic_region_change",
+    "bot_cmd_tts",
+    "bot_main",
+    "bot_cmd_role_icon",
+]
+
+[workspace.package]
+version = "0.1.0"
+
+[workspace.dependencies]
+anyhow = { version = "1.0.89", features = ["backtrace"] }
+async-trait = "0.1.88"
+chrono = { version = "0.4.40", features = ["serde"] }
+dashmap = "6.1.0"
+derive_more = { version = "2.0.1", features = ["full"] }
+dotenv = "0.15.0"
+emojis = "0.6.4"
+fancy-regex = "0.14.0"
+filetime = "0.2.23"
+futures = "0.3.30"
+hex = "0.4.3"
+image_search = "0.4.5"
+imara-diff = "0.1.8"
+itertools = "0.14.0"
+once_cell = "1.21.1"
+poise = { git = "https://github.com/serenity-rs/poise", branch = "next" }
+rand = "0.9.0"
+regex = "1.11.1"
+reqwest = { version = "0.12", features = ["json"] }
+rlimit = "0.10.2"
+scraper = "0.23.1"
+sensible = "0.1.0"
+serde = "^1.0"
+serde_yml = "0.0.12"
+serenity = { version = "0.12.1", features = [
+    "client",
+    "gateway",
+    "rustls_backend",
+    "model",
+    "voice",
+    "cache",
+] }
+sha2 = "0.10.8"
+songbird = { version = "0.5", features = ["builtin-queue"] }
+symphonia = { version = "0.5.2", features = ["mp3"] }
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+url = "2.5.4"
+uuid = { version = "1.14.0", features = ["v4", "fast-rng", "serde"] }
+
+[workspace.lints.clippy]
+get_first = "allow"
+let_and_return = "allow"

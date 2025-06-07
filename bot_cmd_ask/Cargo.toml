@@ -1,0 +1,27 @@
+[package]
+name = "bot_cmd_ask"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+bot_core.path = "../bot_core"
+chrono.workspace = true
+fancy-regex.workspace = true
+image_search.workspace = true
+itertools.workspace = true
+poise.workspace = true
+reqwest.workspace = true
+scraper.workspace = true
+sensible.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+
+[lints]
+workspace = true
+

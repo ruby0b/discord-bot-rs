@@ -1,0 +1,18 @@
+[package]
+name = "bot_cmd_roles"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+bot_core.path = "../bot_core"
+poise.workspace = true
+serde.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true
+
