@@ -135,7 +135,8 @@ async fn main() -> Result<()> {
                 tokio::spawn(config.clone().write_periodically(ctx.clone()));
                 config.init((&ctx.cache, &ctx.http), Some(cfg_guild), cfg_channel).await?;
 
-                bot_cmd_tts::get_clips(ctx, &data).await?;
+                tracing::debug!("Pre-fetching TTS clips");
+                bot_cmd_tts::get_clips(ctx, &data.clone()).await?;
 
                 bot_core::hash_store::purge_expired().await?;
 

@@ -149,6 +149,7 @@ impl Ask {
 }
 
 pub async fn load_asks(ctx: &Context, data: &impl With<ConfigT>) -> Result<()> {
+    tracing::debug!("Loading asks from config");
     let ask_config = data.with_ok(|cfg| cfg.clone()).await?;
     for (msg_id, ask) in ask_config.asks {
         schedule_ask_updates(ctx, data, &ask, msg_id, ask_config.expiration).await;

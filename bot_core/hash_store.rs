@@ -28,6 +28,7 @@ pub async fn get_or_store(
 }
 
 pub async fn purge_expired() -> Result<()> {
+    tracing::debug!("Purging expired files from hash store");
     create_dir(Path::new(STORE_DIR)).await?;
     let mut dir = fs::read_dir(STORE_DIR).await?;
     while let Some(entry) = dir.next_entry().await? {
