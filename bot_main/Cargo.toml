@@ -10,6 +10,7 @@ path = "main.rs"
 [dependencies]
 async-trait.workspace = true
 bot_cmd_ask.path = "../bot_cmd_ask"
+bot_cmd_economy.path = "../bot_cmd_economy"
 bot_cmd_ephemeral_voice_channels.path = "../bot_cmd_ephemeral_voice_channels"
 bot_cmd_eval.path = "../bot_cmd_eval"
 bot_cmd_periodic_region_change.path = "../bot_cmd_periodic_region_change"

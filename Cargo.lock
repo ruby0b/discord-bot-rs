@@ -421,6 +421,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "bot_cmd_economy"
+version = "0.1.0"
+dependencies = [
+ "bot_core",
+ "chrono",
+ "eyre",
+ "fancy-regex",
+ "image_search",
+ "itertools",
+ "num-bigint",
+ "poise",
+ "reqwest 0.12.19",
+ "scraper",
+ "sensible",
+ "serde",
+ "tokio 1.45.1",
+ "tracing",
+ "url",
+]
+
+[[package]]
 name = "bot_cmd_ephemeral_voice_channels"
 version = "0.1.0"
 dependencies = [
@@ -525,6 +546,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bot_cmd_ask",
+ "bot_cmd_economy",
  "bot_cmd_ephemeral_voice_channels",
  "bot_cmd_eval",
  "bot_cmd_periodic_region_change",
@@ -2685,6 +2707,17 @@ checksum = "77a8165726e8236064dbb45459242600304b42a5ea24ee2948e18e023bf7ba84"
 dependencies = [
  "overload",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
+dependencies = [
+ "num-integer",
+ "num-traits",
+ "serde",
 ]
 
 [[package]]

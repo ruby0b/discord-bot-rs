@@ -10,6 +10,7 @@ members = [
     "bot_cmd_tts",
     "bot_main",
     "bot_cmd_role_icon",
+    "bot_cmd_economy",
 ]
 
 [workspace.package]

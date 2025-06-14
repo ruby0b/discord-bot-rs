@@ -1,0 +1,27 @@
+[package]
+name = "bot_cmd_economy"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+bot_core.path = "../bot_core"
+chrono.workspace = true
+eyre.workspace = true
+fancy-regex.workspace = true
+image_search.workspace = true
+itertools.workspace = true
+num-bigint = { version = "0.4.6", features = ["serde"] }
+poise.workspace = true
+reqwest.workspace = true
+scraper.workspace = true
+sensible.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+url.workspace = true
+
+[lints]
+workspace = true

@@ -47,6 +47,7 @@ async fn main() -> Result<()> {
             bot_cmd_eval::typst(),
             bot_cmd_periodic_region_change::auto_region_change(),
             bot_cmd_roles::role_button(),
+            bot_cmd_economy::balance(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some("=".into()),
