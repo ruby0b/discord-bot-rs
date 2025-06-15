@@ -28,7 +28,7 @@ pub struct ConfigData {
     #[serde(default)]
     tts: bot_cmd_tts::ConfigT,
     #[serde(default)]
-    bot_cmd_economy: bot_cmd_economy::ConfigT,
+    economy: bot_cmd_economy::ConfigT,
 }
 
 #[async_trait::async_trait]

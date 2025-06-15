@@ -48,6 +48,8 @@ async fn main() -> Result<()> {
             bot_cmd_periodic_region_change::auto_region_change(),
             bot_cmd_roles::role_button(),
             bot_cmd_economy::balance(),
+            bot_cmd_economy::gamble(),
+            bot_cmd_economy::show_gamble(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some("=".into()),
@@ -91,33 +93,44 @@ async fn main() -> Result<()> {
                     }
                     FullEvent::InteractionCreate {
                         interaction: Interaction::Component(component),
-                    } => match component.data.custom_id.as_ref() {
-                        bot_cmd_ask::JOIN_BUTTON_ID => {
-                            bot_cmd_ask::button_pressed(
-                                framework,
-                                component,
-                                bot_cmd_ask::JoinOrLeave::Join,
-                            )
-                            .await?;
+                    } => {
+                        let full_id = &component.data.custom_id;
+                        let (id, param) = full_id.split_once(":").unwrap_or((full_id, ""));
+                        match id {
+                            bot_cmd_ask::JOIN_BUTTON_ID => {
+                                bot_cmd_ask::button_pressed(
+                                    framework,
+                                    component,
+                                    bot_cmd_ask::JoinOrLeave::Join,
+                                )
+                                .await?;
+                            }
+                            bot_cmd_ask::LEAVE_BUTTON_ID => {
+                                bot_cmd_ask::button_pressed(
+                                    framework,
+                                    component,
+                                    bot_cmd_ask::JoinOrLeave::Leave,
+                                )
+                                .await?;
+                            }
+                            bot_cmd_ask::LEAVE_SERVER_BUTTON_ID => {
+                                bot_cmd_ask::leave_server(framework, component).await?;
+                            }
+                            bot_cmd_roles::SHOW_ROLE_SELECTION_ID => {
+                                bot_cmd_roles::show_role_selection(framework, component).await?;
+                            }
+                            bot_cmd_economy::BUYIN_BUTTON_ID => {
+                                bot_cmd_economy::buyin_button_pressed(framework, component, param)
+                                    .await?;
+                            }
+                            // bot_cmd_economy::PAYOUT_BUTTON_ID => {
+                            //     bot_cmd_economy::payout_button_pressed(framework, component).await?;
+                            // }
+                            unknown_id => {
+                                tracing::warn!("Unknown interaction: {unknown_id}");
+                            }
                         }
-                        bot_cmd_ask::LEAVE_BUTTON_ID => {
-                            bot_cmd_ask::button_pressed(
-                                framework,
-                                component,
-                                bot_cmd_ask::JoinOrLeave::Leave,
-                            )
-                            .await?;
-                        }
-                        bot_cmd_ask::LEAVE_SERVER_BUTTON_ID => {
-                            bot_cmd_ask::leave_server(framework, component).await?;
-                        }
-                        bot_cmd_roles::SHOW_ROLE_SELECTION_ID => {
-                            bot_cmd_roles::show_role_selection(framework, component).await?;
-                        }
-                        unknown_id => {
-                            tracing::warn!("Unknown component interaction: {unknown_id}");
-                        }
-                    },
+                    }
                     _ => {}
                 }
                 Ok(())

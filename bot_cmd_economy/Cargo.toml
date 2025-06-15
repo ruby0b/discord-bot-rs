@@ -13,15 +13,16 @@ eyre.workspace = true
 fancy-regex.workspace = true
 image_search.workspace = true
 itertools.workspace = true
-num-bigint = { version = "0.4.6", features = ["serde"] }
 poise.workspace = true
 reqwest.workspace = true
 scraper.workspace = true
 sensible.workspace = true
 serde.workspace = true
+serde_with.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 url.workspace = true
+uuid.workspace = true
 
 [lints]
 workspace = true

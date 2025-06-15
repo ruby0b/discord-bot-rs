@@ -42,6 +42,7 @@ rlimit = "0.10.2"
 scraper = "0.23.1"
 sensible = "0.1.0"
 serde = "^1.0"
+serde_with = "3.13.0"
 serde_yml = "0.0.12"
 serenity = { version = "0.12.1", features = [
     "client",
