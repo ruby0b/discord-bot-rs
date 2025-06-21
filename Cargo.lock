@@ -426,6 +426,7 @@ version = "0.1.0"
 dependencies = [
  "bot_core",
  "chrono",
+ "dashmap 6.1.0",
  "eyre",
  "fancy-regex",
  "image_search",
@@ -436,6 +437,7 @@ dependencies = [
  "sensible",
  "serde",
  "serde_with",
+ "serde_yml",
  "tokio 1.45.1",
  "tracing",
  "url",

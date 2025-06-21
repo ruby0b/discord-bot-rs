@@ -123,11 +123,15 @@ async fn main() -> Result<()> {
                                 bot_cmd_economy::buyin_button_pressed(framework, component, param)
                                     .await?;
                             }
-                            // bot_cmd_economy::PAYOUT_BUTTON_ID => {
-                            //     bot_cmd_economy::payout_button_pressed(framework, component).await?;
-                            // }
+                            bot_cmd_economy::PAYOUT_BUTTON_ID => {
+                                bot_cmd_economy::payout_button_pressed(framework, component, param)
+                                    .await?;
+                            }
                             unknown_id => {
-                                tracing::warn!("Unknown interaction: {unknown_id}");
+                                // convention: local interaction ids start with ~
+                                if !unknown_id.starts_with('~') {
+                                    tracing::warn!("Unknown interaction: {unknown_id}");
+                                }
                             }
                         }
                     }

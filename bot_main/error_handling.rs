@@ -1,6 +1,8 @@
 use eyre::Error;
-use poise::serenity_prelude::{Colour, CreateEmbed, FullEvent, Interaction};
-use poise::{CreateReply, FrameworkError, serenity_prelude as serenity};
+use poise::serenity_prelude::{
+    Colour, CreateEmbed, CreateInteractionResponse, FullEvent, Interaction,
+};
+use poise::{CreateReply, FrameworkError};
 
 pub async fn on_error<D>(error: FrameworkError<'_, D, Error>) {
     if let Err(e) = async {
@@ -15,15 +17,27 @@ pub async fn on_error<D>(error: FrameworkError<'_, D, Error>) {
                     interaction: Interaction::Component(component),
                 } = event
                 {
-                    component
+                    let reply = error_reply(format!("```\n{error:#}\n```"));
+                    // XXX: There is no way for us to know if the interaction has already been responded to,
+                    // so we try to create a response first, and if that fails, we send a followup instead.
+                    // This is obviously terrible. 
+                    if (component
                         .create_response(
                             framework.serenity_context,
-                            serenity::CreateInteractionResponse::Message(
-                                error_reply(format!("```\n{error:#}\n```"))
-                                    .to_slash_initial_response(Default::default()),
+                            CreateInteractionResponse::Message(
+                                reply.clone().to_slash_initial_response(Default::default()),
                             ),
                         )
-                        .await?;
+                        .await)
+                        .is_err()
+                    {
+                        component
+                            .create_followup(
+                                framework.serenity_context,
+                                reply.to_slash_followup_response(Default::default()),
+                            )
+                            .await?;
+                    }
                 }
             }
             FrameworkError::Command { error, ctx, .. } => {

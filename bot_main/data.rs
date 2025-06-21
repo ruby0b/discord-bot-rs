@@ -11,6 +11,7 @@ pub struct BotData(
     Arc<bot_cmd_tts::StateT>,
     Arc<bot_cmd_ephemeral_voice_channels::StateT>,
     Arc<bot_cmd_periodic_region_change::StateT>,
+    Arc<bot_cmd_economy::StateT>,
 );
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default, AsRef, AsMut)]
