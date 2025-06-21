@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
             bot_cmd_eval::typst(),
             bot_cmd_periodic_region_change::auto_region_change(),
             bot_cmd_roles::role_button(),
-            bot_cmd_economy::balance(),
+            bot_cmd_economy::account(),
             bot_cmd_economy::gamble(),
             bot_cmd_economy::show_gamble(),
         ],

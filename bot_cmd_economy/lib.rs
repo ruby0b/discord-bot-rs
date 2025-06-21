@@ -6,8 +6,8 @@ use itertools::{Itertools, enumerate};
 use poise::CreateReply;
 use poise::serenity_prelude::{
     Builder, ButtonStyle, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed,
-    CreateInputText, CreateInteractionResponse, CreateQuickModal, InputTextStyle, Mentionable as _,
-    UserId,
+    CreateInputText, CreateInteractionResponse, CreateQuickModal, InputTextStyle, Member,
+    Mentionable as _, UserId,
 };
 use serde_with::{DisplayFromStr, serde_as};
 use std::collections::BTreeMap;
@@ -23,6 +23,7 @@ pub const PAYOUT_BUTTON_ID: &str = "economy.payout";
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
 pub struct ConfigT {
     currency: String,
+    #[serde(with = "bot_core::serde::td_seconds")]
     #[default(TimeDelta::days(1))]
     income_cooldown: TimeDelta,
     #[default(100)]
@@ -43,7 +44,7 @@ struct UserAccount {
     last_income: Option<DateTime<Utc>>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 struct GamblingTable {
     dealer: UserId,
     name: String,
@@ -96,28 +97,76 @@ impl GamblingTable {
 
 /// Check your balance and claim your income
 #[poise::command(slash_command, guild_only)]
-pub async fn balance<D: With<ConfigT>>(ctx: CmdContext<'_, D>) -> Result<()> {
+pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Member>) -> Result<()> {
+    let member = match user {
+        Some(m) => m,
+        None => ctx.author_member().await.some()?.into_owned(),
+    };
+
     let cur = &get_currency(ctx.data()).await?;
-    let (account, income) = ctx
+    let (account, income, tables) = ctx
         .data()
         .with_mut_ok(|cfg| {
-            let account = cfg.account.entry(ctx.author().id).or_default();
+            let account = cfg.account.entry(member.user.id).or_default();
             let mut income = None;
             if account.last_income.is_none_or(|date| date < Utc::now() - cfg.income_cooldown) {
                 income = Some(cfg.income_amount);
-                account.last_income = Some(Utc::now());
-                account.balance += cfg.income_amount;
+                // only claim income for yourself
+                if member.user.id == ctx.author().id {
+                    account.last_income = Some(Utc::now());
+                    account.balance += cfg.income_amount;
+                }
             }
-            (account.clone(), income)
+
+            let tables = cfg
+                .gambling_tables
+                .values()
+                .filter(|t| t.players.contains_key(&member.user.id) || t.dealer == member.user.id)
+                .cloned()
+                .collect_vec();
+
+            (account.clone(), income, tables)
         })
         .await?;
 
-    ctx.say(format!(
-        "Your balance is: {}{}",
-        currency(cur, account.balance),
-        income.map(|i| format!(" (received {} as income)", currency(cur, i))).unwrap_or_default()
-    ))
-    .await?;
+    let mut embed =
+        CreateEmbed::new().title(member.display_name()).colour(Colour::BLITZ_BLUE).field(
+            "Balance",
+            format!(
+                "{}{}",
+                currency(cur, account.balance),
+                income
+                    .map(|i| format!(" (collected {} income)", currency(cur, i)))
+                    .unwrap_or_default()
+            ),
+            true,
+        );
+
+    embed = embed.thumbnail(
+        member
+            .avatar_url()
+            .or(member.user.avatar_url())
+            .unwrap_or(member.user.default_avatar_url()),
+    );
+
+    if !tables.is_empty() {
+        let tables_summary = tables
+            .iter()
+            .map(|t| {
+                format!(
+                    "{} — Pot: {}{}",
+                    t.name,
+                    currency(cur, t.pot),
+                    (t.dealer != member.user.id)
+                        .then_some(format!(" — Dealer: {}", t.dealer.mention()))
+                        .unwrap_or_default()
+                )
+            })
+            .join("\n");
+        embed = embed.field("Gambling Tables", tables_summary, false);
+    }
+
+    ctx.send(CreateReply::new().embed(embed)).await?;
 
     Ok(())
 }
@@ -134,10 +183,9 @@ pub async fn gamble<D: With<ConfigT>>(
     let id = Uuid::new_v4();
     let table = GamblingTable {
         name: format!(
-            "{}'s {}{}Gambling Table",
+            "{}'s {}Gambling Table",
             ctx.author_member().await.some()?.display_name(),
-            name.clone().unwrap_or_default(),
-            if name.is_some() { " " } else { "" },
+            name.map(|n| format!("{n} ")).unwrap_or_default(),
         ),
         buyin,
         dealer: ctx.author().id,
