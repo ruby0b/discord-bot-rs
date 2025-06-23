@@ -119,6 +119,7 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
                 }
             }
 
+            // tables the user is involved in
             let tables = cfg
                 .gambling_tables
                 .iter()
@@ -316,7 +317,6 @@ pub async fn payout_button_pressed(
         "You are not the dealer of this table. Only the dealer can pay out."
     );
 
-    let players_vec = table.players.keys().collect_vec();
     let template = {
         let mut players = BTreeMap::new();
         for (idx, (id, bet)) in enumerate(&table.players) {
@@ -340,29 +340,26 @@ pub async fn payout_button_pressed(
         return Ok(());
     };
 
-    let yaml_str = modal_response.inputs.get(0).ok_or_eyre("No input value provided")?;
-    let yaml = serde_yml::from_str::<BTreeMap<String, u64>>(yaml_str)?;
-    let payout_map = yaml
-        .into_iter()
-        .filter_map(|(key, payout)| {
-            let idx = key.split_once('@')?.0.parse::<usize>().ok()?;
-            Some((**players_vec.get(idx)?, payout))
-        })
-        .collect::<BTreeMap<_, _>>();
+    let payout_map = {
+        let yaml_str = modal_response.inputs.get(0).ok_or_eyre("No input value provided")?;
+        let yaml = serde_yml::from_str::<BTreeMap<String, u64>>(yaml_str)?;
+        let players_vec = table.players.keys().collect_vec();
+        yaml.into_iter()
+            .filter_map(|(key, payout)| {
+                let idx = key.split_once('@')?.0.parse::<usize>().ok()?;
+                Some((**players_vec.get(idx)?, payout))
+            })
+            .collect::<BTreeMap<_, _>>()
+    };
 
-    let summary = payout_map
-        .iter()
-        .map(|(&id, &amount)| format!("{}: {}", id.mention(), currency(cur, amount)))
-        .join("\n");
-    let embed = CreateEmbed::new().title("Pay Out").description(summary).colour(Colour::GOLD);
+    let embed = {
+        let summary = payout_map
+            .iter()
+            .map(|(&id, &amount)| format!("{}: {}", id.mention(), currency(cur, amount)))
+            .join("\n");
 
-    const CONFIRM_ID: &str = "~economy.confirm";
-    const CANCEL_ID: &str = "~economy.cancel";
-    let msg =
-        CreateReply::new().embed(embed.clone()).components(vec![CreateActionRow::Buttons(vec![
-            CreateButton::new(CONFIRM_ID).label("Confirm").style(ButtonStyle::Success),
-            CreateButton::new(CANCEL_ID).label("Cancel").style(ButtonStyle::Danger),
-        ])]);
+        CreateEmbed::new().title("Pay Out").description(summary).colour(Colour::GOLD)
+    };
 
     modal_response
         .interaction
@@ -371,28 +368,41 @@ pub async fn payout_button_pressed(
 
     let (button_int, table) = {
         // we have to lock the table until the payout is confirmed and processed
-        let lock = ctx.user_data.state().table_locks.entry(table_id).or_default().clone();
-        let _lock = lock.lock().await;
+        let mutex = ctx.user_data.state().table_locks.entry(table_id).or_default().clone();
+        let _lock = mutex.lock().await;
 
-        modal_response
-            .interaction
-            .edit_response(
-                ctx.serenity_context,
-                msg.to_slash_initial_response_edit(Default::default()),
-            )
-            .await?;
-        let response_msg = modal_response.interaction.get_response(ctx.serenity_context).await?;
+        const CONFIRM_ID: &str = "~economy.confirm";
+        const CANCEL_ID: &str = "~economy.cancel";
 
-        let button_int = response_msg
-            .await_component_interaction(ctx.serenity_context)
-            .timeout(Duration::from_secs(60))
-            .await
-            .ok_or_eyre("Took too long to confirm")?;
+        let button_interaction = {
+            let reply =
+                CreateReply::new().embed(embed.clone()).components(vec![CreateActionRow::Buttons(
+                    vec![
+                        CreateButton::new(CONFIRM_ID).label("Confirm").style(ButtonStyle::Success),
+                        CreateButton::new(CANCEL_ID).label("Cancel").style(ButtonStyle::Danger),
+                    ],
+                )]);
 
-        let id = button_int.data.custom_id.as_str();
+            modal_response
+                .interaction
+                .edit_response(
+                    ctx.serenity_context,
+                    reply.to_slash_initial_response_edit(Default::default()),
+                )
+                .await?;
+
+            let msg = modal_response.interaction.get_response(ctx.serenity_context).await?;
+
+            msg.await_component_interaction(ctx.serenity_context)
+                .timeout(Duration::from_secs(60))
+                .await
+                .ok_or_eyre("Took too long to confirm")?
+        };
+
+        let id = button_interaction.data.custom_id.as_str();
         match id {
             CONFIRM_ID | CANCEL_ID => {
-                button_int
+                button_interaction
                     .create_response(
                         ctx.serenity_context,
                         CreateInteractionResponse::UpdateMessage(
@@ -407,14 +417,15 @@ pub async fn payout_button_pressed(
                     return Ok(());
                 }
             }
-            _ => bail!("Unexpected interaction id: {}", button_int.data.custom_id),
+            _ => bail!("Unexpected interaction id: {}", button_interaction.data.custom_id),
         }
 
         let table = ctx.user_data.with_mut(|cfg| pay_out(cfg, table_id, &payout_map)).await?;
 
-        (button_int, table)
+        (button_interaction, table)
     };
 
+    // mark the payout message as successful with green
     button_int
         .edit_response(
             ctx.serenity_context,
@@ -425,6 +436,7 @@ pub async fn payout_button_pressed(
         )
         .await?;
 
+    // update the table message as it is now deactived
     table
         .deactivated_reply(cur)
         .to_prefix_edit(Default::default())
