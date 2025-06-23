@@ -20,7 +20,7 @@ pub async fn on_error<D>(error: FrameworkError<'_, D, Error>) {
                     let reply = error_reply(format!("```\n{error:#}\n```"));
                     // XXX: There is no way for us to know if the interaction has already been responded to,
                     // so we try to create a response first, and if that fails, we send a followup instead.
-                    // This is obviously terrible. 
+                    // This is obviously terrible.
                     if (component
                         .create_response(
                             framework.serenity_context,

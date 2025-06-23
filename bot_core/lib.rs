@@ -7,7 +7,7 @@ pub mod serde;
 pub mod template;
 
 use eyre::{OptionExt as _, Result};
-use poise::serenity_prelude::{ChannelId, VoiceState};
+use poise::serenity_prelude::{ChannelId, Member, VoiceState};
 use std::sync::Arc;
 
 pub type EvtContext<'a, D> = poise::FrameworkContext<'a, D, eyre::Error>;
@@ -86,4 +86,8 @@ impl VoiceChange {
             _ => VoiceChange::Stay,
         }
     }
+}
+
+pub fn avatar_url(member: Member) -> String {
+    member.avatar_url().or(member.user.avatar_url()).unwrap_or(member.user.default_avatar_url())
 }

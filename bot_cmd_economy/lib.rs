@@ -1,13 +1,14 @@
-use bot_core::{CmdContext, EvtContext, OptionExt as _, State, With};
+use bot_core::{CmdContext, EvtContext, OptionExt as _, State, With, avatar_url};
 use chrono::{DateTime, TimeDelta, Utc};
 use dashmap::DashMap;
 use eyre::{OptionExt, Result, bail, ensure};
 use itertools::{Itertools, enumerate};
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    Builder, ButtonStyle, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed,
-    CreateInputText, CreateInteractionResponse, CreateQuickModal, InputTextStyle, Member,
-    Mentionable as _, UserId,
+    Builder, ButtonStyle, Colour, ComponentInteraction, ComponentInteractionDataKind,
+    CreateActionRow, CreateButton, CreateEmbed, CreateInputText, CreateInteractionResponse,
+    CreateQuickModal, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption,
+    InputTextStyle, Member, Mentionable as _, UserId,
 };
 use serde_with::{DisplayFromStr, serde_as};
 use std::collections::BTreeMap;
@@ -120,58 +121,94 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
 
             let tables = cfg
                 .gambling_tables
-                .values()
-                .filter(|t| t.players.contains_key(&member.user.id) || t.dealer == member.user.id)
-                .cloned()
-                .collect_vec();
+                .iter()
+                .filter(|(_, t)| {
+                    t.players.contains_key(&member.user.id) || t.dealer == member.user.id
+                })
+                .map(|(id, t)| (*id, t.clone()))
+                .collect::<BTreeMap<_, _>>();
 
             (account.clone(), income, tables)
         })
         .await?;
 
-    let mut embed =
-        CreateEmbed::new().title(member.display_name()).colour(Colour::BLITZ_BLUE).field(
-            "Balance",
-            format!(
-                "{}{}",
-                currency(cur, account.balance),
-                income
-                    .map(|i| format!(" (collected {} income)", currency(cur, i)))
-                    .unwrap_or_default()
-            ),
-            true,
-        );
-
-    embed = embed.thumbnail(
-        member
-            .avatar_url()
-            .or(member.user.avatar_url())
-            .unwrap_or(member.user.default_avatar_url()),
-    );
-
-    if !tables.is_empty() {
-        let tables_summary = tables
-            .iter()
-            .map(|t| {
-                format!(
-                    "{} — Pot: {}{}",
-                    t.name,
-                    currency(cur, t.pot),
-                    (t.dealer != member.user.id)
-                        .then_some(format!(" — Dealer: {}", t.dealer.mention()))
-                        .unwrap_or_default()
-                )
+    let embed = {
+        let income_str = income
+            .map(|i| {
+                if member.user.id == ctx.author().id {
+                    format!(" (collected {} income)", currency(cur, i))
+                } else {
+                    format!(" ({} uncollected income)", currency(cur, i))
+                }
             })
-            .join("\n");
-        embed = embed.field("Gambling Tables", tables_summary, false);
+            .unwrap_or_default();
+
+        CreateEmbed::new()
+            .title(member.display_name())
+            .colour(Colour::BLITZ_BLUE)
+            .field("Balance", format!("{}{income_str}", currency(cur, account.balance)), true)
+            .thumbnail(avatar_url(member))
+    };
+
+    let mut components = vec![];
+
+    // add a selection menu to view tables you're involved in
+    if !tables.is_empty() {
+        let options = tables
+            .iter()
+            .map(|(&id, t)| {
+                CreateSelectMenuOption::new(t.name.clone(), id).description(format!(
+                    "Buy-in: {} — Pot: {}",
+                    currency(cur, t.buyin),
+                    currency(cur, t.pot)
+                ))
+            })
+            .collect_vec();
+
+        components.push(CreateActionRow::SelectMenu(
+            CreateSelectMenu::new("~economy.table", CreateSelectMenuKind::String { options })
+                .min_values(1)
+                .max_values(1)
+                .placeholder("View a gambling table..."),
+        ))
     }
 
-    ctx.send(CreateReply::new().embed(embed)).await?;
+    let handle = ctx.send(CreateReply::new().embed(embed).components(components)).await?;
+    let message = handle.message().await?;
+
+    while let Some(int) = message.await_component_interaction(ctx).await {
+        if let ComponentInteractionDataKind::StringSelect { values } = &int.data.kind {
+            handle_table_select(&ctx, &int, values).await?
+        }
+    }
 
     Ok(())
 }
 
-/// Create a new gambling table or display an existing one
+async fn handle_table_select(
+    ctx: &CmdContext<'_, impl With<ConfigT>>,
+    interaction: &ComponentInteraction,
+    values: &[String],
+) -> Result<()> {
+    let table_id = values.first().some()?.parse::<Uuid>()?;
+    let cur = &get_currency(ctx.data()).await?;
+    let table = ctx
+        .data()
+        .with(|cfg| {
+            cfg.gambling_tables
+                .get(&table_id)
+                .cloned()
+                .ok_or_eyre("No gambling table found with id {table_id}")
+        })
+        .await?;
+
+    let response = table.reply(cur, table_id).to_slash_initial_response(Default::default());
+    interaction.create_response(ctx, CreateInteractionResponse::Message(response)).await?;
+
+    Ok(())
+}
+
+/// Create a new gambling table
 #[poise::command(slash_command, guild_only)]
 pub async fn gamble<D: With<ConfigT>>(
     ctx: CmdContext<'_, D>,
@@ -183,7 +220,7 @@ pub async fn gamble<D: With<ConfigT>>(
     let id = Uuid::new_v4();
     let table = GamblingTable {
         name: format!(
-            "{}'s {}Gambling Table",
+            "{}'s {} Table",
             ctx.author_member().await.some()?.display_name(),
             name.map(|n| format!("{n} ")).unwrap_or_default(),
         ),
@@ -198,30 +235,6 @@ pub async fn gamble<D: With<ConfigT>>(
     ctx.data().with_mut_ok(|cfg| cfg.gambling_tables.insert(id, table)).await?;
 
     ctx.send(reply).await?;
-
-    Ok(())
-}
-
-/// Display an existing gambling table
-#[poise::command(slash_command, guild_only)]
-pub async fn show_gamble<D: With<ConfigT>>(
-    ctx: CmdContext<'_, D>,
-    // todo: autocomplete
-    #[description = "ID of the gambling table to show"] table_id: Uuid,
-) -> Result<()> {
-    let cur = &get_currency(ctx.data()).await?;
-
-    let table = ctx
-        .data()
-        .with(|cfg| {
-            cfg.gambling_tables
-                .get(&table_id)
-                .cloned()
-                .ok_or_eyre("No gambling table found with id {table_id}")
-        })
-        .await?;
-
-    ctx.send(table.reply(cur, table_id)).await?;
 
     Ok(())
 }
