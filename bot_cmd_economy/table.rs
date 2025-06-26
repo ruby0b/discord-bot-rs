@@ -1,6 +1,6 @@
 use crate::{ConfigT, GamblingTable, StateT, currency, get_currency};
 use bot_core::{CmdContext, EvtContext, OptionExt as _, State, With};
-use eyre::{OptionExt, Result, bail, ensure};
+use eyre::{OptionExt, Result, ensure};
 use itertools::{Itertools, enumerate};
 use poise::CreateReply;
 use poise::serenity_prelude::{
@@ -37,6 +37,8 @@ pub async fn gamble<D: With<ConfigT>>(
     let reply = table.reply(cur, id);
 
     ctx.data().with_mut_ok(|cfg| cfg.gambling_tables.insert(id, table)).await?;
+
+    ctx.data().with_mut(|cfg| buy_in(cfg, id, ctx.cache().current_user().id, cur)).await?;
 
     ctx.send(reply).await?;
 
@@ -120,6 +122,8 @@ pub async fn payout_button_pressed(
         "You are not the dealer of this table. Only the dealer can pay out."
     );
 
+    ensure!(!table.players.is_empty(), "No players to pay out.");
+
     let template = {
         let mut players = BTreeMap::new();
         for (idx, (id, bet)) in enumerate(&table.players) {
@@ -144,15 +148,32 @@ pub async fn payout_button_pressed(
     };
 
     let payout_map = {
-        let yaml_str = modal_response.inputs.get(0).ok_or_eyre("No input value provided")?;
-        let yaml = serde_yml::from_str::<BTreeMap<String, u64>>(yaml_str)?;
+        let yaml = serde_yml::from_str::<BTreeMap<String, u64>>(
+            modal_response.inputs.get(0).ok_or_eyre("No input value provided")?,
+        )?;
+
+        let factor = {
+            let sum = yaml.values().sum::<u64>();
+            table.pot as f64 / if sum != 0 { sum as f64 } else { table.players.len() as f64 }
+        };
+
         let players_vec = table.players.keys().collect_vec();
-        yaml.into_iter()
+
+        let mut map = yaml
+            .into_iter()
             .filter_map(|(key, payout)| {
                 let idx = key.split_once('@')?.0.parse::<usize>().ok()?;
+                let payout = (payout as f64 * factor) as u64;
                 Some((**players_vec.get(idx)?, payout))
             })
-            .collect::<BTreeMap<_, _>>()
+            .collect::<BTreeMap<_, _>>();
+
+        // in case we have any money left over in the pot, suggest giving it to a winner
+        let new_sum = map.values().sum::<u64>();
+        let winner = map.iter_mut().max_by_key(|(_, amount)| **amount).some()?;
+        *winner.1 += table.pot - new_sum;
+
+        map
     };
 
     let embed = {
@@ -169,7 +190,7 @@ pub async fn payout_button_pressed(
         .create_response(ctx.serenity_context, CreateInteractionResponse::Defer(Default::default()))
         .await?;
 
-    let (button_int, table) = {
+    let (msg, table) = {
         // we have to lock the table until the payout is confirmed and processed
         let mutex = ctx.user_data.state().table_locks.entry(table_id).or_default().clone();
         let _lock = mutex.lock().await;
@@ -177,7 +198,7 @@ pub async fn payout_button_pressed(
         const CONFIRM_ID: &str = "~economy.confirm";
         const CANCEL_ID: &str = "~economy.cancel";
 
-        let button_interaction = {
+        let msg = {
             let reply =
                 CreateReply::new().embed(embed.clone()).components(vec![CreateActionRow::Buttons(
                     vec![
@@ -194,49 +215,36 @@ pub async fn payout_button_pressed(
                 )
                 .await?;
 
-            let msg = modal_response.interaction.get_response(ctx.serenity_context).await?;
-
-            msg.await_component_interaction(ctx.serenity_context)
-                .timeout(Duration::from_secs(60))
-                .await
-                .ok_or_eyre("Took too long to confirm")?
+            modal_response.interaction.get_response(ctx.serenity_context).await?
         };
 
-        let id = button_interaction.data.custom_id.as_str();
-        match id {
-            CONFIRM_ID | CANCEL_ID => {
-                button_interaction
-                    .create_response(
-                        ctx.serenity_context,
-                        CreateInteractionResponse::UpdateMessage(
-                            CreateReply::new()
-                                .components(vec![])
-                                .embed(embed.clone().colour(Colour::DARKER_GREY))
-                                .to_slash_initial_response(Default::default()),
-                        ),
-                    )
-                    .await?;
-                if id == CANCEL_ID {
-                    return Ok(());
-                }
-            }
-            _ => bail!("Unexpected interaction id: {}", button_interaction.data.custom_id),
+        let confirm_interaction = msg
+            .await_component_interaction(ctx.serenity_context)
+            .timeout(Duration::from_secs(60))
+            .await;
+
+        CreateReply::new()
+            .components(vec![])
+            .embed(embed.clone().colour(Colour::DARKER_GREY))
+            .to_prefix_edit(Default::default())
+            .execute(ctx.serenity_context, (msg.channel_id, msg.id, Some(msg.author.id)))
+            .await?;
+
+        if confirm_interaction.map(|i| i.data.custom_id).is_none_or(|id| id != CONFIRM_ID) {
+            return Ok(());
         }
 
         let table = ctx.user_data.with_mut(|cfg| pay_out(cfg, table_id, &payout_map)).await?;
 
-        (button_interaction, table)
+        (msg, table)
     };
 
     // mark the payout message as successful with green
-    button_int
-        .edit_response(
-            ctx.serenity_context,
-            CreateReply::new()
-                .components(vec![])
-                .embed(embed.colour(Colour::DARK_GREEN))
-                .to_slash_initial_response_edit(Default::default()),
-        )
+    CreateReply::new()
+        .components(vec![])
+        .embed(embed.colour(Colour::DARK_GREEN))
+        .to_prefix_edit(Default::default())
+        .execute(ctx.serenity_context, (msg.channel_id, msg.id, Some(msg.author.id)))
         .await?;
 
     // update the table message as it is now deactived
