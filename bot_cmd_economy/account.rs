@@ -111,12 +111,7 @@ async fn handle_table_select(
     let cur = &get_currency(ctx.data()).await?;
     let table = ctx
         .data()
-        .with(|cfg| {
-            cfg.gambling_tables
-                .get(&table_id)
-                .cloned()
-                .ok_or_eyre("No gambling table found with id {table_id}")
-        })
+        .with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist"))
         .await?;
 
     let response = table.reply(cur, table_id).to_slash_initial_response(Default::default());
