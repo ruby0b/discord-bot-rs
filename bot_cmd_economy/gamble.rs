@@ -9,6 +9,7 @@ pub async fn gamble<D: With<ConfigT>>(
     ctx: CmdContext<'_, D>,
     #[description = "Buy-in for the table"] buyin: u64,
     #[description = "Name of the gambling table"] name: Option<String>,
+    #[description = "Description"] description: Option<String>,
 ) -> Result<()> {
     let cur = Currency::read(ctx.data()).await?;
 
@@ -19,6 +20,7 @@ pub async fn gamble<D: With<ConfigT>>(
             ctx.author_member().await.some()?.display_name(),
             name.map(|n| format!("{n} ")).unwrap_or_default(),
         ),
+        description,
         buyin,
         dealer: ctx.author().id,
         players: Default::default(),

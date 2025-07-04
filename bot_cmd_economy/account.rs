@@ -1,4 +1,4 @@
-use crate::{ConfigT, Currency, Income};
+use crate::{ConfigT, Currency, DailyIncome};
 use bot_core::{CmdContext, OptionExt as _, With, avatar_url};
 use chrono::{DateTime, Datelike, Local, TimeZone};
 use eyre::{OptionExt, Result};
@@ -21,19 +21,20 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
     };
 
     let cur = Currency::read(ctx.data()).await?;
-    let (account, income_desc, tables) = ctx
+    let (account, rewarded_days, income, tables) = ctx
         .data()
         .with_mut_ok(|cfg| {
             let account = cfg.account.entry(member.user.id).or_default();
 
             let now = Local::now();
             let last_claim = account.last_claim.map(|t| t.into());
-            let income_desc = describe_income(&due_income(cfg.income, last_claim, now));
+            let rewarded_days = rewarded_days(&cfg.daily_income, last_claim, now);
+            let income = (rewarded_days as u64) * cfg.daily_income.amount;
 
             // claim income for yourself
-            if !income_desc.is_empty() && member.user.id == ctx.author().id {
+            if income != 0 && member.user.id == ctx.author().id {
                 account.last_claim = Some(now.into());
-                account.balance += income_desc.iter().map(|(_, v)| v).sum::<u64>();
+                account.balance += income;
             }
 
             // tables the user is involved in
@@ -46,7 +47,7 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
                 .map(|(id, t)| (*id, t.clone()))
                 .collect::<BTreeMap<_, _>>();
 
-            (account.clone(), income_desc, tables)
+            (account.clone(), rewarded_days, income, tables)
         })
         .await?;
 
@@ -54,15 +55,16 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
         .title(member.display_name())
         .colour(Colour::BLITZ_BLUE)
         .thumbnail(avatar_url(&member))
-        .field("Balance", cur.fmt(account.balance).to_string(), false);
+        .field("Balance", cur.fmt(account.balance).to_string(), true);
 
-    if !income_desc.is_empty() {
-        let income_str = income_desc
-            .into_iter()
-            .map(|(interval, amount)| format!("{interval}: {}", cur.fmt(amount)))
-            .join("\n");
+    if income != 0 {
+        let income_str = format!(
+            "{rewarded_days} day{}: +{}",
+            if rewarded_days > 1 { "s" } else { "" },
+            cur.fmt(income)
+        );
         let title = if member.user.id == ctx.author().id { "Income" } else { "Uncollected Income" };
-        embed = embed.field(title, income_str, false)
+        embed = embed.field(title, income_str, true)
     }
 
     let mut components = vec![];
@@ -118,38 +120,12 @@ async fn handle_table_select(
     Ok(())
 }
 
-fn due_income<TZ: TimeZone>(
-    mut income: Income,
+fn rewarded_days<TZ: TimeZone>(
+    income: &DailyIncome,
     last_claim: Option<DateTime<TZ>>,
     now: DateTime<TZ>,
-) -> Income {
-    let Some(last_claim) = last_claim else { return income };
-
-    if last_claim.num_days_from_ce() >= now.num_days_from_ce() {
-        income.daily = 0;
-    }
-    if last_claim.year() >= now.year() && last_claim.iso_week() >= now.iso_week() {
-        income.weekly = 0;
-    }
-    if last_claim.year() >= now.year() && last_claim.month() >= now.month() {
-        income.monthly = 0;
-    }
-
-    income
-}
-
-fn describe_income(income: &Income) -> Vec<(String, u64)> {
-    let mut desc = vec![];
-
-    if income.daily > 0 {
-        desc.push(("Daily".to_string(), income.daily));
-    }
-    if income.weekly > 0 {
-        desc.push(("Weekly".to_string(), income.weekly));
-    }
-    if income.monthly > 0 {
-        desc.push(("Monthly".to_string(), income.monthly));
-    }
-
-    desc
+) -> u32 {
+    let Some(last_claim) = last_claim else { return income.grace_period_days };
+    let days_passed = now.num_days_from_ce() - last_claim.num_days_from_ce();
+    days_passed.clamp(0, income.grace_period_days as i32) as u32
 }

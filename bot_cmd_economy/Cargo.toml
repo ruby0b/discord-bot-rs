@@ -21,6 +21,7 @@ sensible.workspace = true
 serde.workspace = true
 serde_with.workspace = true
 serde_yml.workspace = true
+thousands.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 url.workspace = true

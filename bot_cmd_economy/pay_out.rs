@@ -150,7 +150,7 @@ async fn payout_confirm(
 
     let summary = payout_map
         .iter()
-        .map(|(&id, &amount)| format!("{}: {}", id.mention(), cur.fmt(amount)))
+        .map(|(&id, &amount)| format!("{} {}", id.mention(), cur.fmt(amount)))
         .join("\n");
     let embed = CreateEmbed::new().title("Pay Out").description(summary).colour(Colour::GOLD);
 
@@ -220,9 +220,7 @@ fn parse_payout(
 
         let (user, amount) = line.split_once(':').ok_or_eyre("Invalid payout format")?;
         let user = name_to_id.get(user.trim()).copied().ok_or_eyre("Invalid user in payout")?;
-        if let Ok(payout) = amount.trim().parse::<u64>()
-            && payout > 0
-        {
+        if let Ok(payout) = amount.trim().parse::<u64>() {
             map.insert(user, payout);
         }
     }

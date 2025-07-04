@@ -16,6 +16,7 @@ use poise::serenity_prelude::{
 };
 use serde_with::{DisplayFromStr, serde_as};
 use std::collections::BTreeMap;
+use thousands::Separable;
 use uuid::Uuid;
 
 pub const BUYIN_BUTTON_ID: &str = "economy.buyin";
@@ -26,7 +27,7 @@ pub const PAY_PLAYER_BUTTON_ID: &str = "economy.pay_player";
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
 pub struct ConfigT {
     currency: Currency,
-    income: Income,
+    daily_income: DailyIncome,
     account: BTreeMap<UserId, UserAccount>,
     #[serde_as(as = "BTreeMap<DisplayFromStr, _>")]
     gambling_tables: BTreeMap<Uuid, GamblingTable>,
@@ -48,26 +49,16 @@ impl Currency {
     }
 
     fn fmt(&self, money: u64) -> String {
-        format!("{money} {}", self.symbol)
+        format!("{} {}", money.separate_with_commas(), self.symbol)
     }
 }
 
 #[derive(
-    serde::Serialize,
-    serde::Deserialize,
-    Clone,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Default,
-    Copy,
+    serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default,
 )]
-struct Income {
-    daily: u64,
-    weekly: u64,
-    monthly: u64,
+struct DailyIncome {
+    amount: u64,
+    grace_period_days: u32,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
@@ -80,6 +71,7 @@ struct UserAccount {
 struct GamblingTable {
     dealer: UserId,
     name: String,
+    description: Option<String>,
     buyin: u64,
     players: BTreeMap<UserId, u64>,
     pot: u64,
@@ -88,17 +80,21 @@ struct GamblingTable {
 impl GamblingTable {
     fn embed(&self, cur: &Currency) -> CreateEmbed {
         let mut embed = CreateEmbed::default()
-            .title(self.name.clone())
+            .title(&self.name)
             .colour(Colour::GOLD)
             .field("Buy-in", cur.fmt(self.buyin), true)
             .field("Pot", cur.fmt(self.pot), true);
+
+        if let Some(description) = &self.description {
+            embed = embed.description(description);
+        }
 
         if !self.players.is_empty() {
             embed = embed.field(
                 "Bets",
                 self.players
                     .iter()
-                    .map(|(p, &bet)| format!("{}: {}", p.mention(), cur.fmt(bet)))
+                    .map(|(p, &bet)| format!("{} {}", p.mention(), cur.fmt(bet)))
                     .collect::<Vec<_>>()
                     .join("\n"),
                 false,
