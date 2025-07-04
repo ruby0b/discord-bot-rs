@@ -1,14 +1,12 @@
-use crate::{ConfigT, GamblingTable, StateT, currency, get_currency};
-use bot_core::{
-    CreateReplyExt, EvtContext, OptionExt as _, State, With, deferred_message, to_snd,
-};
+use crate::{ConfigT, Currency, GamblingTable, StateT};
+use bot_core::{CreateReplyExt, EvtContext, OptionExt as _, State, With, deferred_message, to_snd};
 use eyre::{OptionExt, Result, ensure};
 use itertools::Itertools;
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    ButtonStyle, Cache, Colour, ComponentInteraction, CreateActionRow, CreateButton,
-    CreateEmbed, CreateInputText, CreateQuickModal, InputTextStyle, Mentionable as _, Message,
-    ModalInteraction, QuickModalResponse, UserId,
+    ButtonStyle, Cache, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed,
+    CreateInputText, CreateQuickModal, InputTextStyle, Mentionable as _, Message, ModalInteraction,
+    QuickModalResponse, UserId,
 };
 use std::collections::BTreeMap;
 use std::time::Duration;
@@ -19,12 +17,12 @@ pub async fn pay_player_button_pressed(
     component: &ComponentInteraction,
     param: &str,
 ) -> Result<()> {
-    let cur = &get_currency(ctx.user_data).await?;
+    let cur = Currency::read(ctx.user_data).await?;
     let table_id = Uuid::try_parse(param)?;
 
     let prefix =
         "# Only keep players you want to pay out.\n# Enter the amount of money those player won.";
-    let (table, modal) = payout_modal(&ctx, component, cur, table_id, prefix).await?;
+    let (table, modal) = payout_modal(&ctx, &cur, component, table_id, prefix).await?;
     let Some(modal) = modal else { return Ok(()) };
 
     let payout_map = {
@@ -43,7 +41,8 @@ pub async fn pay_player_button_pressed(
             .collect::<BTreeMap<_, _>>()
     };
 
-    payout_confirm(ctx, table_id, &component.message, &modal.interaction, &payout_map, cur).await?;
+    payout_confirm(ctx, &cur, table_id, &component.message, &modal.interaction, &payout_map)
+        .await?;
 
     Ok(())
 }
@@ -53,11 +52,11 @@ pub async fn pay_table_button_pressed(
     component: &ComponentInteraction,
     param: &str,
 ) -> Result<()> {
-    let cur = &get_currency(ctx.user_data).await?;
+    let cur = Currency::read(ctx.user_data).await?;
     let table_id = Uuid::try_parse(param)?;
 
     let prefix = "# Enter the amount of money each player won";
-    let (table, modal) = payout_modal(&ctx, component, cur, table_id, prefix).await?;
+    let (table, modal) = payout_modal(&ctx, &cur, component, table_id, prefix).await?;
     let Some(modal) = modal else { return Ok(()) };
 
     let payout_map = {
@@ -90,15 +89,16 @@ pub async fn pay_table_button_pressed(
         map
     };
 
-    payout_confirm(ctx, table_id, &component.message, &modal.interaction, &payout_map, cur).await?;
+    payout_confirm(ctx, &cur, table_id, &component.message, &modal.interaction, &payout_map)
+        .await?;
 
     Ok(())
 }
 
 async fn payout_modal(
     ctx: &EvtContext<'_, impl With<ConfigT> + State<StateT>>,
+    cur: &Currency,
     component: &ComponentInteraction,
-    cur: &str,
     table_id: Uuid,
     prefix: &str,
 ) -> Result<(GamblingTable, Option<QuickModalResponse>)> {
@@ -122,7 +122,7 @@ async fn payout_modal(
             let name = &ctx.serenity_context.cache.user(user_id).some()?.name;
             players_string.push_str(&format!("\n{name}: {bet}"));
         }
-        format!("{prefix}\n# Pot is {}\n{players_string}", currency(cur, table.pot))
+        format!("{prefix}\n# Pot is {}\n{players_string}", cur.fmt(table.pot))
     };
 
     let modal = CreateQuickModal::new("Pay Out")
@@ -136,11 +136,11 @@ async fn payout_modal(
 
 async fn payout_confirm(
     ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
+    cur: &Currency,
     table_id: Uuid,
     table_message: &Message,
     interaction: &ModalInteraction,
     payout_map: &BTreeMap<UserId, u64>,
-    cur: &str,
 ) -> Result<()> {
     deferred_message(ctx.serenity_context, interaction).await?;
 
@@ -150,7 +150,7 @@ async fn payout_confirm(
 
     let summary = payout_map
         .iter()
-        .map(|(&id, &amount)| format!("{}: {}", id.mention(), currency(cur, amount)))
+        .map(|(&id, &amount)| format!("{}: {}", id.mention(), cur.fmt(amount)))
         .join("\n");
     let embed = CreateEmbed::new().title("Pay Out").description(summary).colour(Colour::GOLD);
 
@@ -220,7 +220,9 @@ fn parse_payout(
 
         let (user, amount) = line.split_once(':').ok_or_eyre("Invalid payout format")?;
         let user = name_to_id.get(user.trim()).copied().ok_or_eyre("Invalid user in payout")?;
-        if let Ok(payout) = amount.trim().parse::<u64>() {
+        if let Ok(payout) = amount.trim().parse::<u64>()
+            && payout > 0
+        {
             map.insert(user, payout);
         }
     }
@@ -250,7 +252,7 @@ fn apply_payout(
         tracing::info!(
             "User {} received {} from {}",
             player_id.mention(),
-            currency(&cfg.currency, payout),
+            cfg.currency.fmt(payout),
             table.name
         );
     }

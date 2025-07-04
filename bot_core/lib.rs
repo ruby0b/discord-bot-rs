@@ -95,7 +95,7 @@ impl VoiceChange {
     }
 }
 
-pub fn avatar_url(member: Member) -> String {
+pub fn avatar_url(member: &Member) -> String {
     member.avatar_url().or(member.user.avatar_url()).unwrap_or(member.user.default_avatar_url())
 }
 

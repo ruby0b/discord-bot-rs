@@ -8,7 +8,7 @@ pub use crate::buy_in::*;
 pub use crate::gamble::*;
 pub use crate::pay_out::*;
 use bot_core::{LockSet, With};
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 use eyre::Result;
 use poise::CreateReply;
 use poise::serenity_prelude::{
@@ -25,12 +25,8 @@ pub const PAY_PLAYER_BUTTON_ID: &str = "economy.pay_player";
 #[serde_as]
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
 pub struct ConfigT {
-    currency: String,
-    #[serde(with = "bot_core::serde::td_seconds")]
-    #[default(TimeDelta::days(1))]
-    income_cooldown: TimeDelta,
-    #[default(100)]
-    income_amount: u64,
+    currency: Currency,
+    income: Income,
     account: BTreeMap<UserId, UserAccount>,
     #[serde_as(as = "BTreeMap<DisplayFromStr, _>")]
     gambling_tables: BTreeMap<Uuid, GamblingTable>,
@@ -41,10 +37,43 @@ pub struct StateT {
     table_locks: LockSet<Uuid>,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Default)]
+struct Currency {
+    symbol: String,
+}
+
+impl Currency {
+    async fn read(data: &impl With<ConfigT>) -> Result<Currency> {
+        data.with_ok(|cfg| cfg.currency.clone()).await
+    }
+
+    fn fmt(&self, money: u64) -> String {
+        format!("{money} {}", self.symbol)
+    }
+}
+
+#[derive(
+    serde::Serialize,
+    serde::Deserialize,
+    Clone,
+    Debug,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Default,
+    Copy,
+)]
+struct Income {
+    daily: u64,
+    weekly: u64,
+    monthly: u64,
+}
+
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
 struct UserAccount {
     balance: u64,
-    last_income: Option<DateTime<Utc>>,
+    last_claim: Option<DateTime<Utc>>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
@@ -57,19 +86,19 @@ struct GamblingTable {
 }
 
 impl GamblingTable {
-    fn embed(&self, cur: &str) -> CreateEmbed {
+    fn embed(&self, cur: &Currency) -> CreateEmbed {
         let mut embed = CreateEmbed::default()
             .title(self.name.clone())
             .colour(Colour::GOLD)
-            .field("Buy-in", currency(cur, self.buyin), true)
-            .field("Pot", currency(cur, self.pot), true);
+            .field("Buy-in", cur.fmt(self.buyin), true)
+            .field("Pot", cur.fmt(self.pot), true);
 
         if !self.players.is_empty() {
             embed = embed.field(
                 "Bets",
                 self.players
                     .iter()
-                    .map(|(p, &bet)| format!("{}: {}", p.mention(), currency(cur, bet)))
+                    .map(|(p, &bet)| format!("{}: {}", p.mention(), cur.fmt(bet)))
                     .collect::<Vec<_>>()
                     .join("\n"),
                 false,
@@ -95,19 +124,11 @@ impl GamblingTable {
         vec![CreateActionRow::Buttons(vec![buyin_button, payout_button, payout_player_button])]
     }
 
-    fn reply(&self, cur: &str, id: Uuid) -> CreateReply {
+    fn reply(&self, cur: &Currency, id: Uuid) -> CreateReply {
         CreateReply::new().embed(self.embed(cur)).components(self.components(id))
     }
 
-    fn deactivated_reply(&self, cur: &str) -> CreateReply {
+    fn deactivated_reply(&self, cur: &Currency) -> CreateReply {
         CreateReply::new().embed(self.embed(cur).colour(Colour::DARKER_GREY)).components(vec![])
     }
-}
-
-fn currency(symbol: &str, money: u64) -> String {
-    format!("{money} {symbol}")
-}
-
-async fn get_currency(data: &impl With<ConfigT>) -> Result<String> {
-    data.with_ok(|cfg| cfg.currency.clone()).await
 }

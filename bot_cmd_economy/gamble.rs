@@ -1,4 +1,4 @@
-use crate::{ConfigT, GamblingTable, get_currency};
+use crate::{ConfigT, Currency, GamblingTable};
 use bot_core::{CmdContext, OptionExt as _, With};
 use eyre::Result;
 use uuid::Uuid;
@@ -7,10 +7,10 @@ use uuid::Uuid;
 #[poise::command(slash_command, guild_only)]
 pub async fn gamble<D: With<ConfigT>>(
     ctx: CmdContext<'_, D>,
-    #[description = "Buy-in amount for the table"] buyin: u64,
+    #[description = "Buy-in for the table"] buyin: u64,
     #[description = "Name of the gambling table"] name: Option<String>,
 ) -> Result<()> {
-    let cur = &get_currency(ctx.data()).await?;
+    let cur = Currency::read(ctx.data()).await?;
 
     let id = Uuid::new_v4();
     let table = GamblingTable {
@@ -25,7 +25,7 @@ pub async fn gamble<D: With<ConfigT>>(
         pot: 0,
     };
 
-    let reply = table.reply(cur, id);
+    let reply = table.reply(&cur, id);
 
     ctx.data().with_mut_ok(|cfg| cfg.gambling_tables.insert(id, table)).await?;
 

@@ -1,6 +1,6 @@
-use crate::{ConfigT, currency, get_currency};
+use crate::{ConfigT, Currency, Income};
 use bot_core::{CmdContext, OptionExt as _, With, avatar_url};
-use chrono::Utc;
+use chrono::{DateTime, Datelike, Local, TimeZone};
 use eyre::{OptionExt, Result};
 use itertools::Itertools;
 use poise::CreateReply;
@@ -20,19 +20,20 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
         None => ctx.author_member().await.some()?.into_owned(),
     };
 
-    let cur = &get_currency(ctx.data()).await?;
-    let (account, income, tables) = ctx
+    let cur = Currency::read(ctx.data()).await?;
+    let (account, income_desc, tables) = ctx
         .data()
         .with_mut_ok(|cfg| {
             let account = cfg.account.entry(member.user.id).or_default();
-            let mut income = None;
-            if account.last_income.is_none_or(|date| date < Utc::now() - cfg.income_cooldown) {
-                income = Some(cfg.income_amount);
-                // only claim income for yourself
-                if member.user.id == ctx.author().id {
-                    account.last_income = Some(Utc::now());
-                    account.balance += cfg.income_amount;
-                }
+
+            let now = Local::now();
+            let last_claim = account.last_claim.map(|t| t.into());
+            let income_desc = describe_income(&due_income(cfg.income, last_claim, now));
+
+            // claim income for yourself
+            if !income_desc.is_empty() && member.user.id == ctx.author().id {
+                account.last_claim = Some(now.into());
+                account.balance += income_desc.iter().map(|(_, v)| v).sum::<u64>();
             }
 
             // tables the user is involved in
@@ -45,27 +46,24 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
                 .map(|(id, t)| (*id, t.clone()))
                 .collect::<BTreeMap<_, _>>();
 
-            (account.clone(), income, tables)
+            (account.clone(), income_desc, tables)
         })
         .await?;
 
-    let embed = {
-        let income_str = income
-            .map(|i| {
-                if member.user.id == ctx.author().id {
-                    format!(" (collected {} income)", currency(cur, i))
-                } else {
-                    format!(" ({} uncollected income)", currency(cur, i))
-                }
-            })
-            .unwrap_or_default();
+    let mut embed = CreateEmbed::new()
+        .title(member.display_name())
+        .colour(Colour::BLITZ_BLUE)
+        .thumbnail(avatar_url(&member))
+        .field("Balance", cur.fmt(account.balance).to_string(), false);
 
-        CreateEmbed::new()
-            .title(member.display_name())
-            .colour(Colour::BLITZ_BLUE)
-            .field("Balance", format!("{}{income_str}", currency(cur, account.balance)), true)
-            .thumbnail(avatar_url(member))
-    };
+    if !income_desc.is_empty() {
+        let income_str = income_desc
+            .into_iter()
+            .map(|(interval, amount)| format!("{interval}: {}", cur.fmt(amount)))
+            .join("\n");
+        let title = if member.user.id == ctx.author().id { "Income" } else { "Uncollected Income" };
+        embed = embed.field(title, income_str, false)
+    }
 
     let mut components = vec![];
 
@@ -76,8 +74,8 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
             .map(|(&id, t)| {
                 CreateSelectMenuOption::new(t.name.clone(), id).description(format!(
                     "Buy-in: {} — Pot: {}",
-                    currency(cur, t.buyin),
-                    currency(cur, t.pot)
+                    cur.fmt(t.buyin),
+                    cur.fmt(t.pot)
                 ))
             })
             .collect_vec();
@@ -108,14 +106,50 @@ async fn handle_table_select(
     values: &[String],
 ) -> Result<()> {
     let table_id = values.first().some()?.parse::<Uuid>()?;
-    let cur = &get_currency(ctx.data()).await?;
+    let cur = Currency::read(ctx.data()).await?;
     let table = ctx
         .data()
         .with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist"))
         .await?;
 
-    let response = table.reply(cur, table_id).to_slash_initial_response(Default::default());
+    let response = table.reply(&cur, table_id).to_slash_initial_response(Default::default());
     interaction.create_response(ctx, CreateInteractionResponse::Message(response)).await?;
 
     Ok(())
+}
+
+fn due_income<TZ: TimeZone>(
+    mut income: Income,
+    last_claim: Option<DateTime<TZ>>,
+    now: DateTime<TZ>,
+) -> Income {
+    let Some(last_claim) = last_claim else { return income };
+
+    if last_claim.num_days_from_ce() >= now.num_days_from_ce() {
+        income.daily = 0;
+    }
+    if last_claim.year() >= now.year() && last_claim.iso_week() >= now.iso_week() {
+        income.weekly = 0;
+    }
+    if last_claim.year() >= now.year() && last_claim.month() >= now.month() {
+        income.monthly = 0;
+    }
+
+    income
+}
+
+fn describe_income(income: &Income) -> Vec<(String, u64)> {
+    let mut desc = vec![];
+
+    if income.daily > 0 {
+        desc.push(("Daily".to_string(), income.daily));
+    }
+    if income.weekly > 0 {
+        desc.push(("Weekly".to_string(), income.weekly));
+    }
+    if income.monthly > 0 {
+        desc.push(("Monthly".to_string(), income.monthly));
+    }
+
+    desc
 }
