@@ -122,9 +122,17 @@ async fn main() -> Result<()> {
                                 bot_cmd_economy::buyin_button_pressed(framework, component, param)
                                     .await?;
                             }
-                            bot_cmd_economy::PAYOUT_BUTTON_ID => {
-                                bot_cmd_economy::payout_button_pressed(framework, component, param)
-                                    .await?;
+                            bot_cmd_economy::PAY_TABLE_BUTTON_ID => {
+                                bot_cmd_economy::pay_table_button_pressed(
+                                    framework, component, param,
+                                )
+                                .await?;
+                            }
+                            bot_cmd_economy::PAY_PLAYER_BUTTON_ID => {
+                                bot_cmd_economy::pay_player_button_pressed(
+                                    framework, component, param,
+                                )
+                                .await?;
                             }
                             unknown_id => {
                                 // convention: local interaction ids start with ~

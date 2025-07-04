@@ -7,9 +7,8 @@ pub use crate::account::*;
 pub use crate::buy_in::*;
 pub use crate::gamble::*;
 pub use crate::pay_out::*;
-use bot_core::With;
+use bot_core::{LockSet, With};
 use chrono::{DateTime, TimeDelta, Utc};
-use dashmap::DashMap;
 use eyre::Result;
 use poise::CreateReply;
 use poise::serenity_prelude::{
@@ -17,12 +16,11 @@ use poise::serenity_prelude::{
 };
 use serde_with::{DisplayFromStr, serde_as};
 use std::collections::BTreeMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
 pub const BUYIN_BUTTON_ID: &str = "economy.buyin";
-pub const PAYOUT_BUTTON_ID: &str = "economy.payout";
+pub const PAY_TABLE_BUTTON_ID: &str = "economy.pay_table";
+pub const PAY_PLAYER_BUTTON_ID: &str = "economy.pay_player";
 
 #[serde_as]
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
@@ -40,7 +38,7 @@ pub struct ConfigT {
 
 #[derive(Default)]
 pub struct StateT {
-    table_locks: DashMap<Uuid, Arc<Mutex<()>>>,
+    table_locks: LockSet<Uuid>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
@@ -81,18 +79,24 @@ impl GamblingTable {
         embed
     }
 
-    fn action_row(&self, id: Uuid) -> CreateActionRow {
+    fn components(&self, id: Uuid) -> Vec<CreateActionRow> {
         let buyin_button = CreateButton::new(format!("{BUYIN_BUTTON_ID}:{id}"))
             .style(ButtonStyle::Success)
-            .label("Buy In");
-        let payout_button = CreateButton::new(format!("{PAYOUT_BUTTON_ID}:{id}"))
-            .style(ButtonStyle::Primary)
-            .label("Pay Out");
-        CreateActionRow::Buttons(vec![buyin_button, payout_button])
+            .label("Buy In")
+            .emoji('💸');
+        let payout_button = CreateButton::new(format!("{PAY_TABLE_BUTTON_ID}:{id}"))
+            .style(ButtonStyle::Secondary)
+            .label("Pay Everyone")
+            .emoji('💰');
+        let payout_player_button = CreateButton::new(format!("{PAY_PLAYER_BUTTON_ID}:{id}"))
+            .style(ButtonStyle::Secondary)
+            .label("Pay Player")
+            .emoji('🪙');
+        vec![CreateActionRow::Buttons(vec![buyin_button, payout_button, payout_player_button])]
     }
 
     fn reply(&self, cur: &str, id: Uuid) -> CreateReply {
-        CreateReply::new().embed(self.embed(cur)).components(vec![self.action_row(id)])
+        CreateReply::new().embed(self.embed(cur)).components(self.components(id))
     }
 
     fn deactivated_reply(&self, cur: &str) -> CreateReply {

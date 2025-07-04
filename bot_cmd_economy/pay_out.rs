@@ -1,81 +1,85 @@
 use crate::{ConfigT, GamblingTable, StateT, currency, get_currency};
-use bot_core::{EvtContext, OptionExt as _, State, With};
+use bot_core::{
+    CreateReplyExt, EvtContext, OptionExt as _, State, With, deferred_message, to_snd,
+};
 use eyre::{OptionExt, Result, ensure};
-use itertools::{Itertools, enumerate};
+use itertools::Itertools;
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    Builder, ButtonStyle, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed,
-    CreateInputText, CreateInteractionResponse, CreateQuickModal, InputTextStyle, Mentionable as _,
-    UserId,
+    ButtonStyle, Cache, Colour, ComponentInteraction, CreateActionRow, CreateButton,
+    CreateEmbed, CreateInputText, CreateQuickModal, InputTextStyle, Mentionable as _, Message,
+    ModalInteraction, QuickModalResponse, UserId,
 };
 use std::collections::BTreeMap;
 use std::time::Duration;
 use uuid::Uuid;
 
-pub async fn payout_button_pressed(
+pub async fn pay_player_button_pressed(
     ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
     component: &ComponentInteraction,
     param: &str,
 ) -> Result<()> {
-    let user_id = component.user.id;
-    let guild_id = component.guild_id.some()?;
     let cur = &get_currency(ctx.user_data).await?;
     let table_id = Uuid::try_parse(param)?;
 
-    let table = ctx
-        .user_data
-        .with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist"))
-        .await?;
-
-    ensure!(
-        table.dealer == user_id,
-        "You are not the dealer of this table. Only the dealer can pay out."
-    );
-
-    ensure!(!table.players.is_empty(), "No players to pay out.");
-
-    let template = {
-        let mut players = BTreeMap::new();
-        for (idx, (id, bet)) in enumerate(&table.players) {
-            let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
-            let name = guild.members.get(id).some()?.display_name().to_string();
-            players.insert(format!("{idx}@{name}"), bet);
-        }
-        let yaml_template = serde_yml::to_string(&players)?;
-        format!(
-            "# Enter the amount of money each player won\n# Pot is {}\n\n{yaml_template}",
-            currency(cur, table.pot)
-        )
-    };
-
-    let Some(modal_response) = CreateQuickModal::new("Pay Out")
-        .field(CreateInputText::new(InputTextStyle::Paragraph, "Pay Out", "").value(template))
-        .timeout(Duration::from_secs(10 * 60))
-        .execute(ctx.serenity_context, component.id, &component.token)
-        .await?
-    else {
-        return Ok(());
-    };
+    let prefix =
+        "# Only keep players you want to pay out.\n# Enter the amount of money those player won.";
+    let (table, modal) = payout_modal(&ctx, component, cur, table_id, prefix).await?;
+    let Some(modal) = modal else { return Ok(()) };
 
     let payout_map = {
-        let yaml = serde_yml::from_str::<BTreeMap<String, u64>>(
-            modal_response.inputs.get(0).ok_or_eyre("No input value provided")?,
+        let input_map = parse_payout(
+            &ctx.serenity_context.cache,
+            table.players.keys().copied(),
+            modal.inputs.get(0).ok_or_eyre("No input")?,
+        )?;
+
+        table
+            .players
+            .keys()
+            .copied()
+            .map(to_snd(|user_id| input_map.get(user_id).copied()))
+            .filter_map(|(k, v)| v.map(|v| (k, v)))
+            .collect::<BTreeMap<_, _>>()
+    };
+
+    payout_confirm(ctx, table_id, &component.message, &modal.interaction, &payout_map, cur).await?;
+
+    Ok(())
+}
+
+pub async fn pay_table_button_pressed(
+    ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
+    component: &ComponentInteraction,
+    param: &str,
+) -> Result<()> {
+    let cur = &get_currency(ctx.user_data).await?;
+    let table_id = Uuid::try_parse(param)?;
+
+    let prefix = "# Enter the amount of money each player won";
+    let (table, modal) = payout_modal(&ctx, component, cur, table_id, prefix).await?;
+    let Some(modal) = modal else { return Ok(()) };
+
+    let payout_map = {
+        let input_map = parse_payout(
+            &ctx.serenity_context.cache,
+            table.players.keys().copied(),
+            modal.inputs.get(0).ok_or_eyre("No input")?,
         )?;
 
         let factor = {
-            let sum = yaml.values().sum::<u64>();
+            let sum = input_map.values().sum::<u64>();
             table.pot as f64 / if sum != 0 { sum as f64 } else { table.players.len() as f64 }
         };
 
-        let players_vec = table.players.keys().collect_vec();
-
-        let mut map = yaml
-            .into_iter()
-            .filter_map(|(key, payout)| {
-                let idx = key.split_once('@')?.0.parse::<usize>().ok()?;
-                let payout = (payout as f64 * factor) as u64;
-                Some((**players_vec.get(idx)?, payout))
-            })
+        let mut map = table
+            .players
+            .keys()
+            .copied()
+            .map(to_snd(|user_id| {
+                let payout = input_map.get(user_id).copied().unwrap_or_default();
+                (payout as f64 * factor) as u64
+            }))
             .collect::<BTreeMap<_, _>>();
 
         // in case we have any money left over in the pot, suggest giving it to a winner
@@ -86,113 +90,174 @@ pub async fn payout_button_pressed(
         map
     };
 
-    let embed = {
-        let summary = payout_map
-            .iter()
-            .map(|(&id, &amount)| format!("{}: {}", id.mention(), currency(cur, amount)))
-            .join("\n");
+    payout_confirm(ctx, table_id, &component.message, &modal.interaction, &payout_map, cur).await?;
 
-        CreateEmbed::new().title("Pay Out").description(summary).colour(Colour::GOLD)
-    };
+    Ok(())
+}
 
-    modal_response
-        .interaction
-        .create_response(ctx.serenity_context, CreateInteractionResponse::Defer(Default::default()))
+async fn payout_modal(
+    ctx: &EvtContext<'_, impl With<ConfigT> + State<StateT>>,
+    component: &ComponentInteraction,
+    cur: &str,
+    table_id: Uuid,
+    prefix: &str,
+) -> Result<(GamblingTable, Option<QuickModalResponse>)> {
+    let table = ctx
+        .user_data
+        .with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist"))
         .await?;
 
-    let (msg, table) = {
-        // we have to lock the table until the payout is confirmed and processed
-        let mutex = ctx.user_data.state().table_locks.entry(table_id).or_default().clone();
-        let _lock = mutex.lock().await;
+    ensure!(table.dealer == component.user.id, "You are not the dealer of this table.");
+    ensure!(!table.players.is_empty(), "No players to pay out.");
 
-        const CONFIRM_ID: &str = "~economy.confirm";
-        const CANCEL_ID: &str = "~economy.cancel";
+    let mut name_to_id = BTreeMap::new();
+    for &user_id in table.players.keys() {
+        let name = ctx.serenity_context.cache.user(user_id).some()?.name.clone();
+        name_to_id.insert(name, user_id);
+    }
 
-        let msg = {
-            let reply =
-                CreateReply::new().embed(embed.clone()).components(vec![CreateActionRow::Buttons(
-                    vec![
-                        CreateButton::new(CONFIRM_ID).label("Confirm").style(ButtonStyle::Success),
-                        CreateButton::new(CANCEL_ID).label("Cancel").style(ButtonStyle::Danger),
-                    ],
-                )]);
-
-            modal_response
-                .interaction
-                .edit_response(
-                    ctx.serenity_context,
-                    reply.to_slash_initial_response_edit(Default::default()),
-                )
-                .await?;
-
-            modal_response.interaction.get_response(ctx.serenity_context).await?
-        };
-
-        let confirm_interaction = msg
-            .await_component_interaction(ctx.serenity_context)
-            .timeout(Duration::from_secs(60))
-            .await;
-
-        CreateReply::new()
-            .components(vec![])
-            .embed(embed.clone().colour(Colour::DARKER_GREY))
-            .to_prefix_edit(Default::default())
-            .execute(ctx.serenity_context, (msg.channel_id, msg.id, Some(msg.author.id)))
-            .await?;
-
-        if confirm_interaction.map(|i| i.data.custom_id).is_none_or(|id| id != CONFIRM_ID) {
-            return Ok(());
+    let template = {
+        let mut players_string = String::new();
+        for (user_id, bet) in &table.players {
+            let name = &ctx.serenity_context.cache.user(user_id).some()?.name;
+            players_string.push_str(&format!("\n{name}: {bet}"));
         }
-
-        let table = ctx.user_data.with_mut(|cfg| pay_out(cfg, table_id, &payout_map)).await?;
-
-        (msg, table)
+        format!("{prefix}\n# Pot is {}\n{players_string}", currency(cur, table.pot))
     };
 
-    // mark the payout message as successful with green
+    let modal = CreateQuickModal::new("Pay Out")
+        .field(CreateInputText::new(InputTextStyle::Paragraph, "Pay Out", "").value(template))
+        .timeout(Duration::from_secs(10 * 60))
+        .execute(ctx.serenity_context, component.id, &component.token)
+        .await?;
+
+    Ok((table, modal))
+}
+
+async fn payout_confirm(
+    ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
+    table_id: Uuid,
+    table_message: &Message,
+    interaction: &ModalInteraction,
+    payout_map: &BTreeMap<UserId, u64>,
+    cur: &str,
+) -> Result<()> {
+    deferred_message(ctx.serenity_context, interaction).await?;
+
+    // lock the table until the payout is done
+    let _lock = ctx.user_data.state().table_locks.get(table_id);
+    let _lock = _lock.lock().await;
+
+    let summary = payout_map
+        .iter()
+        .map(|(&id, &amount)| format!("{}: {}", id.mention(), currency(cur, amount)))
+        .join("\n");
+    let embed = CreateEmbed::new().title("Pay Out").description(summary).colour(Colour::GOLD);
+
+    let confirm_id = "~economy.confirm";
+    let cancel_id = "~economy.cancel";
+
+    let message = CreateReply::new()
+        .embed(embed.clone())
+        .components(vec![CreateActionRow::Buttons(vec![
+            CreateButton::new(confirm_id).label("Confirm").style(ButtonStyle::Success),
+            CreateButton::new(cancel_id).label("Cancel").style(ButtonStyle::Danger),
+        ])])
+        .edit_interaction(ctx.serenity_context, interaction)
+        .await?;
+
+    let interaction = message
+        .await_component_interaction(ctx.serenity_context)
+        .timeout(Duration::from_secs(60))
+        .await;
+
+    // deactivate confirmation message in all cases
+    CreateReply::new()
+        .embed(embed.clone().colour(Colour::DARKER_GREY))
+        .components(vec![])
+        .edit_message(ctx.serenity_context, &message)
+        .await?;
+
+    if interaction.is_none_or(|i| i.data.custom_id != confirm_id) {
+        return Ok(());
+    }
+
+    let table = ctx.user_data.with_mut(|cfg| apply_payout(cfg, table_id, payout_map)).await?;
+
     CreateReply::new()
         .components(vec![])
         .embed(embed.colour(Colour::DARK_GREEN))
-        .to_prefix_edit(Default::default())
-        .execute(ctx.serenity_context, (msg.channel_id, msg.id, Some(msg.author.id)))
+        .edit_message(ctx.serenity_context, &message)
         .await?;
 
-    // update the table message as it is now deactived
-    table
-        .deactivated_reply(cur)
-        .to_prefix_edit(Default::default())
-        .execute(
-            ctx.serenity_context,
-            (component.message.channel_id, component.message.id, Some(component.message.author.id)),
-        )
+    if table.pot == 0 { table.deactivated_reply(cur) } else { table.reply(cur, table_id) }
+        .edit_message(ctx.serenity_context, table_message)
         .await?;
 
     Ok(())
 }
 
-fn pay_out(
+fn parse_payout(
+    cache: &Cache,
+    players: impl IntoIterator<Item = UserId>,
+    input: &str,
+) -> Result<BTreeMap<UserId, u64>> {
+    let mut name_to_id = BTreeMap::new();
+    for user_id in players {
+        let name = cache.user(user_id).some()?.name.clone();
+        name_to_id.insert(name, user_id);
+    }
+
+    let mut map = BTreeMap::new();
+
+    for line in input.lines() {
+        let line = line.trim();
+
+        // skip empty lines and comments
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        let (user, amount) = line.split_once(':').ok_or_eyre("Invalid payout format")?;
+        let user = name_to_id.get(user.trim()).copied().ok_or_eyre("Invalid user in payout")?;
+        if let Ok(payout) = amount.trim().parse::<u64>() {
+            map.insert(user, payout);
+        }
+    }
+
+    ensure!(!map.is_empty(), "No payouts specified");
+
+    Ok(map)
+}
+
+fn apply_payout(
     cfg: &mut ConfigT,
     table_id: Uuid,
     payout_map: &BTreeMap<UserId, u64>,
 ) -> Result<GamblingTable> {
-    let table = cfg.gambling_tables.get_mut(&table_id).ok_or_eyre("Table doesn't exist")?.clone();
+    let table = cfg.gambling_tables.get_mut(&table_id).ok_or_eyre("Table doesn't exist")?;
 
     let payout_sum = payout_map.values().sum::<u64>();
-    ensure!(
-        payout_sum == table.pot,
-        format!("Pay out sum needs to match the pot. ({payout_sum} != {})", table.pot)
-    );
+
+    ensure!(payout_sum <= table.pot, "Pay out sum exceeds the pot. ({payout_sum} > {})", table.pot);
+
+    table.pot -= payout_sum;
 
     for (&player_id, &payout) in payout_map {
         let account = cfg.account.entry(player_id).or_default();
         account.balance += payout;
+        table.players.remove(&player_id);
         tracing::info!(
-            "User {player_id} received {} from table {table_id}",
-            currency(&cfg.currency, payout)
+            "User {} received {} from {}",
+            player_id.mention(),
+            currency(&cfg.currency, payout),
+            table.name
         );
     }
 
-    cfg.gambling_tables.remove(&table_id);
-
-    Ok(table)
+    if table.pot == 0 {
+        Ok(cfg.gambling_tables.remove(&table_id).some()?)
+    } else {
+        Ok(table.clone())
+    }
 }

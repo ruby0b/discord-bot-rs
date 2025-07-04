@@ -6,9 +6,16 @@ pub mod hash_store;
 pub mod serde;
 pub mod template;
 
+use dashmap::DashMap;
 use eyre::{OptionExt as _, Result};
-use poise::serenity_prelude::{ChannelId, Member, VoiceState};
+use poise::CreateReply;
+use poise::serenity_prelude::{
+    Builder as _, ChannelId, Context, CreateInteractionResponse, Member, Message, ModalInteraction,
+    VoiceState,
+};
+use std::hash::Hash;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub type EvtContext<'a, D> = poise::FrameworkContext<'a, D, eyre::Error>;
 pub type CmdContext<'a, D> = poise::Context<'a, D, eyre::Error>;
@@ -90,4 +97,60 @@ impl VoiceChange {
 
 pub fn avatar_url(member: Member) -> String {
     member.avatar_url().or(member.user.avatar_url()).unwrap_or(member.user.default_avatar_url())
+}
+
+pub async fn deferred_message(ctx: &Context, interaction: &ModalInteraction) -> Result<()> {
+    CreateInteractionResponse::Defer(Default::default())
+        .execute(ctx, (interaction.id, &interaction.token))
+        .await?;
+    Ok(())
+}
+
+#[async_trait::async_trait]
+pub trait CreateReplyExt {
+    async fn edit_interaction(
+        self,
+        ctx: &Context,
+        interaction: &ModalInteraction,
+    ) -> Result<Message>;
+
+    async fn edit_message(self, ctx: &Context, message: &Message) -> Result<Message>;
+}
+
+#[async_trait::async_trait]
+impl CreateReplyExt for CreateReply {
+    async fn edit_interaction(
+        self,
+        ctx: &Context,
+        interaction: &ModalInteraction,
+    ) -> Result<Message> {
+        Ok(self
+            .to_slash_initial_response_edit(Default::default())
+            .execute(ctx, &interaction.token)
+            .await?)
+    }
+
+    async fn edit_message(self, ctx: &Context, message: &Message) -> Result<Message> {
+        Ok(self
+            .to_prefix_edit(Default::default())
+            .execute(ctx, (message.channel_id, message.id, Some(message.author.id)))
+            .await?)
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct LockSet<K: Eq + Hash>(DashMap<K, Arc<Mutex<()>>>);
+
+impl<K: Eq + Hash> LockSet<K> {
+    pub fn get(&self, key: K) -> Arc<Mutex<()>> {
+        self.0.entry(key).or_default().clone()
+    }
+}
+
+/// Returns a function x -> (x, f(x))
+pub fn to_snd<K, V>(f: impl Fn(&K) -> V) -> impl Fn(K) -> (K, V) {
+    move |key: K| {
+        let value = f(&key);
+        (key, value)
+    }
 }

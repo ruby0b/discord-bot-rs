@@ -15,7 +15,7 @@ pub async fn gamble<D: With<ConfigT>>(
     let id = Uuid::new_v4();
     let table = GamblingTable {
         name: format!(
-            "{}'s {} Table",
+            "{}'s {}Table",
             ctx.author_member().await.some()?.display_name(),
             name.map(|n| format!("{n} ")).unwrap_or_default(),
         ),

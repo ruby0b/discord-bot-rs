@@ -1,13 +1,10 @@
-use bot_core::{EvtContext, OptionExt as _, State, VoiceChange, With};
-use dashmap::DashMap;
+use bot_core::{EvtContext, LockSet, OptionExt as _, State, VoiceChange, With};
 use eyre::Result;
 use itertools::Itertools;
 use poise::serenity_prelude::all::{
     Builder, ChannelId, ChannelType, CreateChannel, GuildChannel, GuildId, VoiceState,
 };
 use poise::serenity_prelude::{self as serenity, Context};
-use std::sync::Arc;
-use tokio::sync::Mutex;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct ConfigT {
@@ -16,8 +13,8 @@ pub struct ConfigT {
 
 #[derive(Default)]
 pub struct StateT {
-    /// 1 mutex per category
-    category_locks: DashMap<serenity::ChannelId, Arc<Mutex<()>>>,
+    /// 1 lock per category
+    category_locks: LockSet<ChannelId>,
 }
 
 pub async fn voice_update(
@@ -105,8 +102,8 @@ async fn keep_one_empty_channel(
 
     // Get exclusive access to the category so concurrent calls don't clash
     // Technically we're leaking memory if categories get deleted 🤓
-    let lock = ctx.user_data.state().category_locks.entry(category_id).or_default().clone();
-    let _lock = lock.lock().await;
+    let _lock = ctx.user_data.state().category_locks.get(category_id);
+    let _lock = _lock.lock().await;
 
     let cat_channels = ctx
         .serenity_context

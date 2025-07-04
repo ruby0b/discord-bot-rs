@@ -9,6 +9,7 @@ path = "lib.rs"
 [dependencies]
 async-trait.workspace = true
 chrono.workspace = true
+dashmap.workspace = true
 eyre.workspace = true
 fancy-regex.workspace = true
 filetime.workspace = true
