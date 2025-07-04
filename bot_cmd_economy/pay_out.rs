@@ -41,8 +41,16 @@ pub async fn pay_player_button_pressed(
             .collect::<BTreeMap<_, _>>()
     };
 
-    payout_confirm(ctx, &cur, table_id, &component.message, &modal.interaction, &payout_map)
-        .await?;
+    payout_confirm(
+        ctx,
+        &cur,
+        table_id,
+        &table,
+        &component.message,
+        &modal.interaction,
+        &payout_map,
+    )
+    .await?;
 
     Ok(())
 }
@@ -89,8 +97,16 @@ pub async fn pay_table_button_pressed(
         map
     };
 
-    payout_confirm(ctx, &cur, table_id, &component.message, &modal.interaction, &payout_map)
-        .await?;
+    payout_confirm(
+        ctx,
+        &cur,
+        table_id,
+        &table,
+        &component.message,
+        &modal.interaction,
+        &payout_map,
+    )
+    .await?;
 
     Ok(())
 }
@@ -138,6 +154,7 @@ async fn payout_confirm(
     ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
     cur: &Currency,
     table_id: Uuid,
+    table: &GamblingTable,
     table_message: &Message,
     interaction: &ModalInteraction,
     payout_map: &BTreeMap<UserId, u64>,
@@ -166,10 +183,20 @@ async fn payout_confirm(
         .edit_interaction(ctx.serenity_context, interaction)
         .await?;
 
-    let interaction = message
-        .await_component_interaction(ctx.serenity_context)
-        .timeout(Duration::from_secs(60))
-        .await;
+    let first_interaction = async {
+        while let Some(interaction) = message
+            .await_component_interaction(ctx.serenity_context)
+            .timeout(Duration::from_secs(60))
+            .await
+        {
+            if table.dealer != interaction.user.id {
+                continue;
+            }
+            return Some(interaction);
+        }
+        None
+    }
+    .await;
 
     // deactivate confirmation message in all cases
     CreateReply::new()
@@ -178,7 +205,7 @@ async fn payout_confirm(
         .edit_message(ctx.serenity_context, &message)
         .await?;
 
-    if interaction.is_none_or(|i| i.data.custom_id != confirm_id) {
+    if first_interaction.is_none_or(|i| i.data.custom_id != confirm_id) {
         return Ok(());
     }
 
