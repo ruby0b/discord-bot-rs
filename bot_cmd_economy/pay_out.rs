@@ -167,6 +167,7 @@ async fn payout_confirm(
 
     let summary = payout_map
         .iter()
+        .sorted_by_key(|(_, v)| *v)
         .map(|(&id, &amount)| format!("{} {}", id.mention(), cur.fmt(amount)))
         .join("\n");
     let embed = CreateEmbed::new().title("Pay Out").description(summary).colour(Colour::GOLD);
@@ -189,10 +190,9 @@ async fn payout_confirm(
             .timeout(Duration::from_secs(60))
             .await
         {
-            if table.dealer != interaction.user.id {
-                continue;
+            if table.dealer == interaction.user.id {
+                return Some(interaction);
             }
-            return Some(interaction);
         }
         None
     }
