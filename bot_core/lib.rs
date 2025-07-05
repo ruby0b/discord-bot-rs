@@ -10,8 +10,8 @@ use dashmap::DashMap;
 use eyre::{OptionExt as _, Result};
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    Builder as _, ChannelId, Context, CreateInteractionResponse, Member, Message, ModalInteraction,
-    VoiceState,
+    Builder as _, ChannelId, ComponentInteraction, Context, CreateInteractionResponse, Member,
+    Message, ModalInteraction, VoiceState,
 };
 use std::hash::Hash;
 use std::sync::Arc;
@@ -106,8 +106,15 @@ pub async fn deferred_message(ctx: &Context, interaction: &ModalInteraction) -> 
     Ok(())
 }
 
+// todo generalize ComponentInteraction and ModalInteraction
 #[async_trait::async_trait]
 pub trait CreateReplyExt {
+    async fn respond_to_interaction(
+        self,
+        ctx: &Context,
+        interaction: &ComponentInteraction,
+    ) -> Result<()>;
+
     async fn edit_interaction(
         self,
         ctx: &Context,
@@ -119,6 +126,16 @@ pub trait CreateReplyExt {
 
 #[async_trait::async_trait]
 impl CreateReplyExt for CreateReply {
+    async fn respond_to_interaction(
+        self,
+        ctx: &Context,
+        interaction: &ComponentInteraction,
+    ) -> Result<()> {
+        Ok(CreateInteractionResponse::Message(self.to_slash_initial_response(Default::default()))
+            .execute(ctx, (interaction.id, &interaction.token))
+            .await?)
+    }
+
     async fn edit_interaction(
         self,
         ctx: &Context,

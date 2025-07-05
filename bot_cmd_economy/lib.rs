@@ -19,6 +19,8 @@ use std::collections::BTreeMap;
 use thousands::Separable;
 use uuid::Uuid;
 
+pub const ACCOUNT_BUTTON_ID: &str = "economy.account";
+pub const TABLE_SELECT_ID: &str = "economy.table_select";
 pub const BUYIN_BUTTON_ID: &str = "economy.buyin";
 pub const PAY_TABLE_BUTTON_ID: &str = "economy.pay_table";
 pub const PAY_PLAYER_BUTTON_ID: &str = "economy.pay_player";

@@ -118,6 +118,12 @@ async fn main() -> Result<()> {
                             bot_cmd_roles::SHOW_ROLE_SELECTION_ID => {
                                 bot_cmd_roles::show_role_selection(framework, component).await?;
                             }
+                            bot_cmd_economy::ACCOUNT_BUTTON_ID => {
+                                bot_cmd_economy::account_button(framework, component).await?;
+                            }
+                            bot_cmd_economy::TABLE_SELECT_ID => {
+                                bot_cmd_economy::table_select(framework, component).await?;
+                            }
                             bot_cmd_economy::BUYIN_BUTTON_ID => {
                                 bot_cmd_economy::buyin_button_pressed(framework, component, param)
                                     .await?;

@@ -1,12 +1,12 @@
-use crate::{ConfigT, Currency, DailyIncome};
-use bot_core::{CmdContext, OptionExt as _, With, avatar_url};
+use crate::{ACCOUNT_BUTTON_ID, ConfigT, Currency, DailyIncome, TABLE_SELECT_ID};
+use bot_core::{CmdContext, CreateReplyExt, EvtContext, OptionExt as _, With, avatar_url};
 use chrono::{DateTime, Datelike, Local, TimeZone};
 use eyre::{OptionExt, Result};
 use itertools::Itertools;
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    Colour, ComponentInteraction, ComponentInteractionDataKind, CreateActionRow, CreateEmbed,
-    CreateInteractionResponse, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption,
+    ButtonStyle, Colour, ComponentInteraction, ComponentInteractionDataKind, CreateActionRow,
+    CreateButton, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption,
     Member,
 };
 use std::collections::BTreeMap;
@@ -15,14 +15,51 @@ use uuid::Uuid;
 /// Check your balance and claim your income
 #[poise::command(slash_command, guild_only)]
 pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Member>) -> Result<()> {
-    let member = match user {
-        Some(m) => m,
-        None => ctx.author_member().await.some()?.into_owned(),
+    ctx.send(account_reply(ctx.data(), ctx.author_member().await.some()?.as_ref(), user).await?)
+        .await?;
+    Ok(())
+}
+
+pub async fn account_button(
+    ctx: EvtContext<'_, impl With<ConfigT>>,
+    component: &ComponentInteraction,
+) -> Result<()> {
+    account_reply(ctx.user_data, component.member.as_ref().some()?, None)
+        .await?
+        .respond_to_interaction(ctx.serenity_context, component)
+        .await?;
+    Ok(())
+}
+
+pub async fn table_select(
+    ctx: EvtContext<'_, impl With<ConfigT>>,
+    component: &ComponentInteraction,
+) -> Result<()> {
+    let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind else {
+        return Ok(());
     };
 
-    let cur = Currency::read(ctx.data()).await?;
-    let (account, rewarded_days, income, tables) = ctx
-        .data()
+    let table_id = values.first().some()?.parse::<Uuid>()?;
+    let cur = Currency::read(ctx.user_data).await?;
+    let table = ctx
+        .user_data
+        .with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist"))
+        .await?;
+
+    table.reply(&cur, table_id).respond_to_interaction(ctx.serenity_context, component).await?;
+
+    Ok(())
+}
+
+async fn account_reply(
+    data: &impl With<ConfigT>,
+    author: &Member,
+    member: Option<Member>,
+) -> Result<CreateReply> {
+    let member = member.as_ref().unwrap_or(author);
+
+    let cur = Currency::read(data).await?;
+    let (account, rewarded_days, income, tables) = data
         .with_mut_ok(|cfg| {
             let account = cfg.account.entry(member.user.id).or_default();
 
@@ -32,7 +69,7 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
             let income = (rewarded_days as u64) * cfg.daily_income.amount;
 
             // claim income for yourself
-            if income != 0 && member.user.id == ctx.author().id {
+            if income != 0 && member.user.id == author.user.id {
                 account.last_claim = Some(now.into());
                 account.balance += income;
             }
@@ -54,7 +91,7 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
     let mut embed = CreateEmbed::new()
         .title(member.display_name())
         .colour(Colour::BLITZ_BLUE)
-        .thumbnail(avatar_url(&member))
+        .thumbnail(avatar_url(member))
         .field("Balance", cur.fmt(account.balance).to_string(), true);
 
     if income != 0 {
@@ -63,7 +100,7 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
             if rewarded_days > 1 { "s" } else { "" },
             cur.fmt(income)
         );
-        let title = if member.user.id == ctx.author().id { "Income" } else { "Uncollected Income" };
+        let title = if member.user.id == author.user.id { "Income" } else { "Uncollected Income" };
         embed = embed.field(title, income_str, true)
     }
 
@@ -83,41 +120,18 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
             .collect_vec();
 
         components.push(CreateActionRow::SelectMenu(
-            CreateSelectMenu::new("~economy.table", CreateSelectMenuKind::String { options })
+            CreateSelectMenu::new(TABLE_SELECT_ID, CreateSelectMenuKind::String { options })
                 .min_values(1)
                 .max_values(1)
                 .placeholder("View a gambling table..."),
         ))
     }
 
-    let handle = ctx.send(CreateReply::new().embed(embed).components(components)).await?;
-    let message = handle.message().await?;
+    components.push(CreateActionRow::Buttons(vec![
+        CreateButton::new(ACCOUNT_BUTTON_ID).style(ButtonStyle::Primary).label("/account"),
+    ]));
 
-    while let Some(int) = message.await_component_interaction(ctx).await {
-        if let ComponentInteractionDataKind::StringSelect { values } = &int.data.kind {
-            handle_table_select(&ctx, &int, values).await?
-        }
-    }
-
-    Ok(())
-}
-
-async fn handle_table_select(
-    ctx: &CmdContext<'_, impl With<ConfigT>>,
-    interaction: &ComponentInteraction,
-    values: &[String],
-) -> Result<()> {
-    let table_id = values.first().some()?.parse::<Uuid>()?;
-    let cur = Currency::read(ctx.data()).await?;
-    let table = ctx
-        .data()
-        .with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist"))
-        .await?;
-
-    let response = table.reply(&cur, table_id).to_slash_initial_response(Default::default());
-    interaction.create_response(ctx, CreateInteractionResponse::Message(response)).await?;
-
-    Ok(())
+    Ok(CreateReply::new().embed(embed).components(components))
 }
 
 fn rewarded_days<TZ: TimeZone>(
