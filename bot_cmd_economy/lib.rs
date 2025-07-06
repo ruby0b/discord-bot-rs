@@ -1,11 +1,13 @@
 mod account;
 mod buy_in;
 mod gamble;
+mod leaderboard;
 mod pay_out;
 
 pub use crate::account::*;
 pub use crate::buy_in::*;
 pub use crate::gamble::*;
+pub use crate::leaderboard::*;
 pub use crate::pay_out::*;
 use bot_core::{LockSet, With};
 use chrono::{DateTime, Utc};

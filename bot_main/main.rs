@@ -49,6 +49,7 @@ async fn main() -> Result<()> {
             bot_cmd_roles::role_button(),
             bot_cmd_economy::account(),
             bot_cmd_economy::gamble(),
+            bot_cmd_economy::leaderboard(),
         ],
         prefix_options: poise::PrefixFrameworkOptions {
             prefix: Some("=".into()),
