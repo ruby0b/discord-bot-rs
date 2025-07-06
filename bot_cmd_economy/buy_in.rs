@@ -15,11 +15,10 @@ pub async fn buyin_button_pressed(
 
     component.defer(ctx.serenity_context).await?;
 
-    let table = {
-        let _lock = ctx.user_data.state().table_locks.get(table_id);
-        let _lock = _lock.lock().await;
-        ctx.user_data.with_mut(|cfg| buy_in(cfg, &cur, table_id, user_id)).await?
-    };
+    let _lock = ctx.user_data.state().table_locks.get(table_id);
+    let _lock = _lock.lock().await;
+
+    let table = ctx.user_data.with_mut(|cfg| buy_in(cfg, &cur, table_id, user_id)).await?;
 
     component
         .edit_response(
