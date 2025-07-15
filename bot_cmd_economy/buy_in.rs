@@ -42,8 +42,9 @@ fn buy_in(
     let account = cfg.account.entry(user_id).or_default();
     ensure!(
         account.balance >= table.buyin,
-        "You don't have enough money for a buy-in: {}",
-        cur.fmt(account.balance)
+        "You don't have enough money for a buy-in: {} < {}",
+        cur.fmt(account.balance),
+        cur.fmt(table.buyin),
     );
     account.balance -= table.buyin;
 
