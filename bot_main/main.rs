@@ -101,7 +101,7 @@ async fn main() -> Result<()> {
                                 bot_cmd_ask::button_pressed(
                                     framework,
                                     component,
-                                    bot_cmd_ask::JoinOrLeave::Join,
+                                    bot_cmd_ask::AskButton::Join,
                                 )
                                 .await?;
                             }
@@ -109,7 +109,15 @@ async fn main() -> Result<()> {
                                 bot_cmd_ask::button_pressed(
                                     framework,
                                     component,
-                                    bot_cmd_ask::JoinOrLeave::Leave,
+                                    bot_cmd_ask::AskButton::Leave,
+                                )
+                                .await?;
+                            }
+                            bot_cmd_ask::DECLINE_BUTTON_ID => {
+                                bot_cmd_ask::button_pressed(
+                                    framework,
+                                    component,
+                                    bot_cmd_ask::AskButton::Decline,
                                 )
                                 .await?;
                             }
