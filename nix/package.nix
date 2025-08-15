@@ -41,7 +41,7 @@ craneLib.buildPackage {
   ];
   env = {
     # https://github.com/nix-community/fenix/issues/191
-    RUSTFLAGS = "-Zlinker-features=-lld";
+    RUSTFLAGS = "-Clinker-features=-lld";
   };
   postInstall = ''
     wrapProgram $out/bin/${main} \
