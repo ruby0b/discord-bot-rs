@@ -21,7 +21,7 @@ pub async fn delete_ask_defaults<D: With<ConfigT>>(
         .data()
         .with_mut_ok(|cfg| {
             cfg.defaults
-                .extract_if(|regex, _| regex.0.is_match(&title_pattern).is_ok_and(|x| x))
+                .extract_if(.., |regex, _| regex.0.is_match(&title_pattern).is_ok_and(|x| x))
                 .collect::<BTreeMap<_, _>>()
         })
         .await?;

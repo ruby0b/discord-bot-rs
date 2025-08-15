@@ -12,12 +12,13 @@ use url::Url;
 pub async fn ask<D: With<ConfigT>>(
     ctx: CmdContext<'_, D>,
     #[description = "Game title"] title: String,
-    #[description = "Link to the game"] url: Option<Url>,
     #[description = "Minimum number of players"] min_players: Option<u32>,
     #[description = "Maximum number of players"] max_players: Option<u32>,
     #[description = "Start time"]
     #[autocomplete = bot_core::autocomplete::time]
     start_time: Option<chrono::NaiveTime>,
+    #[description = "Link to the game"] url: Option<Url>,
+    #[description = "Game description"] description: Option<String>,
 ) -> Result<()> {
     let (default, expiration) = ctx
         .data()
@@ -48,7 +49,7 @@ pub async fn ask<D: With<ConfigT>>(
         max_players: max_players.or(default.and_then(|d| d.max_players)),
         title,
         url: url.or(default.and_then(|d| d.url.clone())),
-        description: default.and_then(|d| d.description.clone()),
+        description: description.or(default.and_then(|d| d.description.clone())),
         thumbnail_url: default.and_then(|d| d.thumbnail_url.clone()),
         channel_id: ctx.channel_id(),
         role_id,

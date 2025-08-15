@@ -28,13 +28,13 @@
         final: prev:
         let
           rstrict = final.callPackage ./nix/rstrict.nix { };
-        in
-        {
-          inherit rstrict;
           discord-bot-rs = final.callPackage ./nix/package.nix {
             craneLib = (crane.mkLib final).overrideToolchain final.fenix.minimal.toolchain;
             inherit rstrict;
           };
+        in
+        {
+          inherit discord-bot-rs rstrict;
         };
     in
     {

@@ -9,19 +9,19 @@ use url::Url;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Ask {
-    pub(crate) players: Vec<UserId>,
-    pub(crate) declined_players: Vec<UserId>,
-    pub(crate) min_players: Option<u32>,
-    pub(crate) max_players: Option<u32>,
-    pub(crate) title: String,
-    pub(crate) url: Option<Url>,
-    pub(crate) description: Option<String>,
-    pub(crate) thumbnail_url: Option<String>,
-    pub(crate) channel_id: ChannelId,
-    pub(crate) role_id: Option<RoleId>,
+    pub players: Vec<UserId>,
+    pub declined_players: Vec<UserId>,
+    pub min_players: Option<u32>,
+    pub max_players: Option<u32>,
+    pub title: String,
+    pub url: Option<Url>,
+    pub description: Option<String>,
+    pub thumbnail_url: Option<String>,
+    pub channel_id: ChannelId,
+    pub role_id: Option<RoleId>,
     #[serde(with = "chrono::serde::ts_seconds")]
-    pub(crate) start_time: DateTime<Utc>,
-    pub(crate) pinged: bool,
+    pub start_time: DateTime<Utc>,
+    pub pinged: bool,
 }
 
 impl Ask {
