@@ -1,7 +1,8 @@
 use crate::{Ask, ConfigT};
 use bot_core::With;
+use bot_core::result_ext::ResultExt;
 use chrono::{TimeDelta, Utc};
-use eyre::{OptionExt as _, Result};
+use eyre::{Context as _, OptionExt as _, Result};
 use poise::serenity_prelude::{self as serenity, Builder, Context, MessageId};
 
 pub(crate) async fn schedule_ask_updates(
@@ -79,7 +80,7 @@ async fn fetch_game_thumbnail(
     let Some(edit) = data
         .with_mut_ok(|cfg| {
             let ask = cfg.asks.get_mut(&msg_id)?;
-            ask.thumbnail_url = thumbnail_url;
+            ask.thumbnail_url = thumbnail_url.clone();
             Some(ask.edit_message())
         })
         .await?
@@ -87,7 +88,26 @@ async fn fetch_game_thumbnail(
         return Ok(());
     };
 
-    edit.execute(ctx, (channel_id, msg_id, None)).await?;
+    edit.execute(ctx, (channel_id, msg_id, None))
+        .await
+        .or_else_async(|e| async {
+            // remove thumbnail on error
+            let err = Err(e).wrap_err(format!(
+                "Error while updating ask with thumbnail {thumbnail_url:?}, removing thumbnail"
+            ));
+            match data
+                .with_mut_ok(|cfg| {
+                    let ask = cfg.asks.get_mut(&msg_id)?;
+                    ask.thumbnail_url = None;
+                    Some(())
+                })
+                .await
+            {
+                Ok(_) => err,
+                Err(cfg_err) => err.wrap_err(cfg_err),
+            }
+        })
+        .await?;
 
     Ok(())
 }

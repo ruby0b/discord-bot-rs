@@ -3,6 +3,7 @@
 pub mod audio;
 pub mod autocomplete;
 pub mod hash_store;
+pub mod result_ext;
 pub mod serde;
 pub mod template;
 
