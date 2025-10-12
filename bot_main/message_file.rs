@@ -5,6 +5,7 @@ use poise::serenity_prelude::{
 };
 
 /// File storage using a Discord message attachment
+#[derive(Debug)]
 pub struct MessageFile {
     pub filename: String,
     pub guild_id: Option<GuildId>,

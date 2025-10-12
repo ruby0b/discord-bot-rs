@@ -421,6 +421,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "bot_cmd_bedtime"
+version = "0.1.0"
+dependencies = [
+ "bot_core",
+ "chrono",
+ "dashmap 6.1.0",
+ "derive_more 2.0.1",
+ "eyre",
+ "poise",
+ "sensible",
+ "serde",
+ "tokio 1.45.1",
+ "tracing",
+]
+
+[[package]]
 name = "bot_cmd_economy"
 version = "0.1.0"
 dependencies = [
@@ -547,6 +563,7 @@ dependencies = [
  "eyre",
  "fancy-regex",
  "filetime",
+ "futures",
  "hex",
  "itertools",
  "poise",
@@ -555,6 +572,7 @@ dependencies = [
  "songbird",
  "symphonia",
  "tokio 1.45.1",
+ "tokio-util 0.7.16",
  "tracing",
 ]
 
@@ -564,6 +582,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bot_cmd_ask",
+ "bot_cmd_bedtime",
  "bot_cmd_economy",
  "bot_cmd_ephemeral_voice_channels",
  "bot_cmd_eval",
@@ -1762,7 +1781,7 @@ dependencies = [
  "indexmap 2.9.0",
  "slab",
  "tokio 1.45.1",
- "tokio-util 0.7.15",
+ "tokio-util 0.7.16",
  "tracing",
 ]
 
@@ -1781,7 +1800,7 @@ dependencies = [
  "indexmap 2.9.0",
  "slab",
  "tokio 1.45.1",
- "tokio-util 0.7.15",
+ "tokio-util 0.7.16",
  "tracing",
 ]
 
@@ -3501,7 +3520,7 @@ dependencies = [
  "system-configuration 0.5.1",
  "tokio 1.45.1",
  "tokio-rustls 0.24.1",
- "tokio-util 0.7.15",
+ "tokio-util 0.7.16",
  "tower-service",
  "url",
  "wasm-bindgen",
@@ -3549,7 +3568,7 @@ dependencies = [
  "tokio 1.45.1",
  "tokio-native-tls",
  "tokio-rustls 0.26.2",
- "tokio-util 0.7.15",
+ "tokio-util 0.7.16",
  "tower",
  "tower-http",
  "tower-service",
@@ -4349,7 +4368,7 @@ dependencies = [
  "symphonia-core",
  "tokio 1.45.1",
  "tokio-tungstenite 0.26.2",
- "tokio-util 0.7.15",
+ "tokio-util 0.7.16",
  "tokio-websockets",
  "tracing",
  "tracing-futures",
@@ -5127,14 +5146,18 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.15"
+version = "0.7.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66a539a9ad6d5d281510d5bd368c973d636c02dbf8a67300bfb6b950696ad7df"
+checksum = "14307c986784f72ef81c89db7d9e28d6ac26d16213b109ea501696195e6e3ce5"
 dependencies = [
  "bytes 1.10.1",
  "futures-core",
+ "futures-io",
  "futures-sink",
+ "futures-util",
+ "hashbrown 0.15.4",
  "pin-project-lite 0.2.16",
+ "slab",
  "tokio 1.45.1",
 ]
 
@@ -5158,7 +5181,7 @@ dependencies = [
  "simdutf8",
  "tokio 1.45.1",
  "tokio-rustls 0.26.2",
- "tokio-util 0.7.15",
+ "tokio-util 0.7.16",
 ]
 
 [[package]]

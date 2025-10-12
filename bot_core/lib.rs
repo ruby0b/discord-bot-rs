@@ -8,13 +8,14 @@ pub mod hash_store;
 pub mod result_ext;
 pub mod serde;
 pub mod template;
+pub mod timer_queue;
 
 use dashmap::DashMap;
 use eyre::{OptionExt as _, Result};
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    Builder as _, ChannelId, ComponentInteraction, Context, CreateInteractionResponse, Member,
-    Message, ModalInteraction, VoiceState,
+    Builder as _, Cache, ChannelId, ComponentInteraction, Context, CreateInteractionResponse,
+    Member, Message, ModalInteraction, UserId, VoiceState,
 };
 use std::hash::Hash;
 use std::sync::Arc;
@@ -107,6 +108,10 @@ pub async fn deferred_message(ctx: &Context, interaction: &ModalInteraction) -> 
         .execute(ctx, (interaction.id, &interaction.token))
         .await?;
     Ok(())
+}
+
+pub fn safe_name(ctx: &impl AsRef<Cache>, user_id: &UserId) -> String {
+    user_id.to_user_cached(&ctx).map_or(user_id.to_string(), |u| u.display_name().to_string())
 }
 
 // todo generalize ComponentInteraction and ModalInteraction

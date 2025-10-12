@@ -171,9 +171,9 @@ async fn main() -> Result<()> {
             Box::pin(async move {
                 tracing::info!("Logged in as {}", ready.user.name);
 
-                let data = data::BotData::default();
+                let data = data::GuildData::default();
 
-                let config: &Arc<crate::config::Config<_>> = data.as_ref();
+                let config: &Arc<crate::config::GuildConfig<_>> = data.as_ref();
                 tokio::spawn(config.clone().write_periodically(ctx.clone()));
                 config.init((&ctx.cache, &ctx.http), Some(cfg_guild), cfg_channel).await?;
 

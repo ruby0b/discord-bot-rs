@@ -9,34 +9,37 @@ use poise::serenity_prelude::{
 };
 use poise::{ChoiceParameter, CreateReply, serenity_prelude as serenity};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::RwLock;
+use tokio::sync::{OnceCell, RwLock};
 
 pub trait ConfigDataT = serde::Serialize
     + for<'a> serde::Deserialize<'a>
     + Default
+    + Debug
     + Clone
     + PartialEq
     + Send
     + Sync
     + 'static;
 
-pub struct Config<DataT: ConfigDataT>(RwLock<Option<ConfigInner<DataT>>>);
+pub struct GuildConfig<DataT: ConfigDataT>(RwLock<OnceCell<ConfigInner<DataT>>>);
 
+#[derive(Debug)]
 struct ConfigInner<DataT: ConfigDataT> {
     file: MessageFile,
     cache: DataT,
     dirty: bool,
 }
 
-impl<DataT: ConfigDataT> Default for Config<DataT> {
+impl<DataT: ConfigDataT> Default for GuildConfig<DataT> {
     fn default() -> Self {
-        Self(RwLock::new(None))
+        Self(RwLock::new(OnceCell::new()))
     }
 }
 
-impl<DataT: ConfigDataT> Config<DataT> {
+impl<DataT: ConfigDataT> GuildConfig<DataT> {
     pub async fn init(
         &self,
         chttp: (&Arc<Cache>, &Http),
@@ -60,7 +63,7 @@ impl<DataT: ConfigDataT> Config<DataT> {
         guild_id: Option<GuildId>,
         channel_id: ChannelId,
     ) -> Result<()> {
-        let mut config = self.0.write().await;
+        let config = self.0.write().await;
 
         let cache: DataT = Default::default();
         let file = MessageFile::create(
@@ -74,12 +77,12 @@ impl<DataT: ConfigDataT> Config<DataT> {
 
         file.channel_id.pin(chttp.http(), file.message_id).await?;
 
-        *config = Some(ConfigInner { file, cache, dirty: false });
+        config.set(ConfigInner { file, cache, dirty: false })?;
         Ok(())
     }
 
     pub async fn init_from_message(&self, chttp: &impl CacheHttp, message: &Message) -> Result<()> {
-        let mut config = self.0.write().await;
+        let config = self.0.write().await;
         let mut file = MessageFile::from_message(message)?;
         file.filename = format!("{CONFIG_NAME}.{CONFIG_EXT}");
 
@@ -107,20 +110,20 @@ impl<DataT: ConfigDataT> Config<DataT> {
 
         file.write(chttp, new_str).await?;
 
-        *config = Some(ConfigInner { file, cache, dirty: false });
+        config.set(ConfigInner { file, cache, dirty: false })?;
         Ok(())
     }
 
     pub async fn with<T>(&self, f: impl FnOnce(&DataT) -> Result<T>) -> Result<T> {
         let config = self.0.read().await;
-        let config = config.as_ref().ok_or_eyre("Uninitialized config")?;
+        let config = config.get().ok_or_eyre("Uninitialized config")?;
 
         f(&config.cache)
     }
 
     pub async fn with_mut<T>(&self, f: impl FnOnce(&mut DataT) -> Result<T>) -> Result<T> {
         let mut config = self.0.write().await;
-        let config = config.as_mut().ok_or_eyre("Uninitialized config")?;
+        let config = config.get_mut().ok_or_eyre("Uninitialized config")?;
 
         config.dirty = true;
         f(&mut config.cache)
@@ -141,12 +144,12 @@ impl<DataT: ConfigDataT> Config<DataT> {
     }
 
     async fn is_initialized(&self) -> bool {
-        self.0.read().await.is_some()
+        self.0.read().await.initialized()
     }
 
     async fn write_if_dirty(&self, http: &impl CacheHttp) -> Result<bool> {
         let mut config = self.0.write().await;
-        let config = config.as_mut().ok_or_eyre("Uninitialized config")?;
+        let config = config.get_mut().ok_or_eyre("Uninitialized config")?;
 
         if config.dirty {
             config.file.write(http, to_yaml_string(&config.cache)?).await?;
@@ -187,7 +190,7 @@ enum EditOperation {
     required_permissions = "MANAGE_GUILD",
     default_member_permissions = "MANAGE_GUILD"
 )]
-pub async fn config<D: State<Config<impl ConfigDataT>>>(
+pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
     ctx: CmdContext<'_, D>,
     #[description = "Dot-separated config path"]
     #[autocomplete = autocomplete_config]
@@ -286,7 +289,7 @@ pub async fn config<D: State<Config<impl ConfigDataT>>>(
     Ok(())
 }
 
-async fn edit_in_modal<D: State<Config<impl ConfigDataT>>>(
+async fn edit_in_modal<D: State<GuildConfig<impl ConfigDataT>>>(
     ctx: &CmdContext<'_, D>,
     inter_id: InteractionId,
     inter_token: &str,
@@ -324,7 +327,9 @@ async fn edit_in_modal<D: State<Config<impl ConfigDataT>>>(
     required_permissions = "MANAGE_GUILD",
     default_member_permissions = "MANAGE_GUILD"
 )]
-pub async fn restore<D: State<Config<impl ConfigDataT>>>(ctx: CmdContext<'_, D>) -> Result<()> {
+pub async fn restore<D: State<GuildConfig<impl ConfigDataT>>>(
+    ctx: CmdContext<'_, D>,
+) -> Result<()> {
     let poise::Context::Prefix(pre) = &ctx else { return Ok(()) };
 
     let attachment = pre
@@ -366,7 +371,7 @@ pub async fn restore<D: State<Config<impl ConfigDataT>>>(ctx: CmdContext<'_, D>)
     Ok(())
 }
 
-async fn autocomplete_config<U: State<Config<impl ConfigDataT>>, E>(
+async fn autocomplete_config<U: State<GuildConfig<impl ConfigDataT>>, E>(
     ctx: poise::Context<'_, U, E>,
     input: &str,
 ) -> CreateAutocompleteResponse {
