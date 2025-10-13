@@ -2,7 +2,7 @@ use eyre::Result;
 use futures::StreamExt as _;
 use std::fmt::Debug;
 use tokio::sync::mpsc;
-use tokio::time::{Duration, Instant};
+use tokio::time::Instant;
 use tokio_util::time::DelayQueue;
 
 #[derive(Debug)]
