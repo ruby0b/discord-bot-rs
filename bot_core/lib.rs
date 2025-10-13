@@ -2,6 +2,8 @@
 
 pub mod audio;
 pub mod autocomplete;
+pub mod choice_parameters;
+pub mod color_parameter;
 pub mod hash_store;
 pub mod result_ext;
 pub mod serde;

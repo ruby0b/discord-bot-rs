@@ -45,6 +45,7 @@ async fn main() -> Result<()> {
             bot_cmd_eval::d2(),
             bot_cmd_eval::math(),
             bot_cmd_eval::typst(),
+            bot_cmd_message::message(),
             bot_cmd_periodic_region_change::auto_region_change(),
             bot_cmd_roles::role_button(),
             bot_cmd_economy::account(),

@@ -471,6 +471,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bot_cmd_message"
+version = "0.1.0"
+dependencies = [
+ "bot_core",
+ "eyre",
+ "poise",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "bot_cmd_periodic_region_change"
 version = "0.1.0"
 dependencies = [
@@ -532,6 +543,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dashmap 6.1.0",
+ "derive_more 2.0.1",
  "eyre",
  "fancy-regex",
  "filetime",
@@ -555,6 +567,7 @@ dependencies = [
  "bot_cmd_economy",
  "bot_cmd_ephemeral_voice_channels",
  "bot_cmd_eval",
+ "bot_cmd_message",
  "bot_cmd_periodic_region_change",
  "bot_cmd_role_icon",
  "bot_cmd_roles",

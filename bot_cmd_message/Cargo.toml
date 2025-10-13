@@ -1,0 +1,17 @@
+[package]
+name = "bot_cmd_message"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+bot_core.path = "../bot_core"
+eyre.workspace = true
+poise.workspace = true
+serde.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

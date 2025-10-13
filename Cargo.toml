@@ -5,6 +5,7 @@ members = [
     "bot_cmd_ask",
     "bot_cmd_ephemeral_voice_channels",
     "bot_cmd_eval",
+    "bot_cmd_message",
     "bot_cmd_roles",
     "bot_cmd_periodic_region_change",
     "bot_cmd_tts",
@@ -65,6 +66,7 @@ uuid = { version = "1.14.0", features = ["v4", "fast-rng", "serde"] }
 [workspace.lints.clippy]
 get_first = "allow"
 let_and_return = "allow"
+too_many_arguments = "allow"
 
 [profile.dev.package.backtrace]
 opt-level = 3

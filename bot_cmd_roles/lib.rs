@@ -1,3 +1,4 @@
+use bot_core::choice_parameters::ButtonStyleParameter;
 use bot_core::{CmdContext, EvtContext, OptionExt as _, UserData, With};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use poise::serenity_prelude as serenity;
@@ -46,9 +47,10 @@ pub async fn role_button<D: With<ConfigT>>(_ctx: CmdContext<'_, D>) -> Result<()
 pub async fn new<D: With<ConfigT>>(
     ctx: CmdContext<'_, D>,
     #[description = "Link to a message sent by this bot"] bot_message: Message,
+    #[description = "Button label"] button_label: Option<String>,
+    #[description = "Button style"] button_style: Option<ButtonStyleParameter>,
 ) -> Result<()> {
     ensure!(bot_message.author.id == ctx.framework().bot_id(), "That message wasn't sent by me");
-
     ctx.data()
         .with_mut_ok(|cfg| {
             cfg.buttons.insert(bot_message.id, RoleButtonData { on_click: None, roles: vec![] });
@@ -58,8 +60,8 @@ pub async fn new<D: With<ConfigT>>(
     EditMessage::new()
         .components(vec![CreateActionRow::Buttons(vec![
             CreateButton::new(SHOW_ROLE_SELECTION_ID)
-                .label("Select Roles")
-                .style(ButtonStyle::Primary),
+                .label(button_label.as_ref().map_or("Select Roles", |s| s))
+                .style(button_style.map_or(ButtonStyle::Primary, |s| s.into())),
         ])])
         .execute(ctx, (bot_message.channel_id, bot_message.id, None))
         .await?;
