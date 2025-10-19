@@ -1,26 +1,22 @@
 /*
 TODO add/remove bedtimes (make sure to update interval_set)
-TODO weekly bedtimes support
+/add time Option<date>
+/add should display the bedtime with toggle buttons for each weekday
 */
 
-#![feature(trait_alias)]
-
-mod interval_set;
-mod weekly_time;
-
-use crate::interval_set::IntervalSet;
-use crate::weekly_time::WeeklyTime;
+use bot_core::interval_set::IntervalSet;
+use bot_core::iso_weekday::IsoWeekday;
 use bot_core::serde::LiteralRegex;
 use bot_core::timer_queue::{TimerCommand, spawn_timer_queue};
 use bot_core::{OptionExt, State, With};
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Datelike, Days, TimeDelta, Utc, Weekday};
 use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::all::{GuildId, UserId};
 use poise::serenity_prelude::prelude::Context;
 use poise::serenity_prelude::{Member, RoleId};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use tokio::sync::{OnceCell, mpsc};
+use tokio::sync::{OnceCell, RwLock, mpsc};
 use tokio::time::Instant;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
@@ -33,26 +29,28 @@ pub struct ConfigT {
     users: BTreeMap<UserId, BTreeSet<Bedtime>>,
 }
 
-#[derive(
-    serde::Serialize, serde::Deserialize, Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord,
-)]
-enum Bedtime {
-    Weekly(WeeklyTime),
-    Oneshot(DateTime<Utc>),
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct Bedtime {
+    first: DateTime<Utc>,
+    repeat: BTreeSet<IsoWeekday>,
 }
 
 impl Bedtime {
-    fn current(self) -> DateTime<Utc> {
-        match self {
-            Self::Weekly(_) => todo!("Weekly not yet supported"),
-            Self::Oneshot(x) => x,
+    fn next(&self, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+        if self.first > now {
+            Some(self.first)
+        } else {
+            let today = now.date_naive().and_time(self.first.time()).and_utc();
+            (0..=7).map(|offset| today + Days::new(offset)).find(|&bedtime| {
+                bedtime > now && self.repeat.contains(&IsoWeekday(bedtime.weekday()))
+            })
         }
     }
 }
 
 #[derive(Default)]
 pub struct StateT {
-    bedtime_intervals: OnceCell<BTreeMap<UserId, IntervalSet<DateTime<Utc>>>>,
+    bedtime_intervals: RwLock<BTreeMap<UserId, IntervalSet<DateTime<Utc>>>>,
     timer_sender: OnceCell<mpsc::Sender<TimerCommand<(UserId, StartOrStopBedtime)>>>,
 }
 
@@ -67,40 +65,45 @@ pub async fn bedtime_loop(
     data: impl With<ConfigT> + State<StateT> + State<GuildId>,
 ) -> Result<()> {
     let state: Arc<StateT> = data.state();
-
-    state.bedtime_intervals.set(
-        data.with_ok(|c| {
-            c.users
-                .iter()
-                .map(|(&user_id, bedtimes)| (user_id, build_interval_set(bedtimes, c.duration)))
-                .collect::<BTreeMap<_, _>>()
-        })
-        .await?,
-    )?;
-
+    {
+        let mut intervals = state.bedtime_intervals.write().await;
+        *intervals = get_bedtime_intervals_and_prune(&data).await?;
+    }
     state.timer_sender.set(spawn_timer_queue(move |bedtime| {
-        start_or_stop_bedtime(ctx.clone(), data.clone(), bedtime)
+        let data = data.clone();
+        let ctx = ctx.clone();
+        async move {
+            let data = data.clone();
+            start_or_stop_bedtime(ctx.clone(), &data, bedtime).await
+        }
     }))?;
-
     Ok(())
 }
 
-fn build_interval_set(
-    bedtimes: &BTreeSet<Bedtime>,
-    duration: TimeDelta,
-) -> IntervalSet<DateTime<Utc>> {
-    bedtimes
-        .iter()
-        .map(|x| {
-            let time = x.current();
-            time..(time + duration)
-        })
-        .collect()
+async fn get_bedtime_intervals_and_prune(
+    data: &(impl With<ConfigT> + State<StateT> + State<GuildId>),
+) -> Result<BTreeMap<UserId, IntervalSet<DateTime<Utc>>>> {
+    data.with_mut_ok(|c| {
+        let now = Utc::now() + TimeDelta::seconds(30);
+        c.users
+            .iter_mut()
+            .map(|(&user_id, bedtimes)| {
+                bedtimes.retain(|x| x.next(now).is_some());
+                let intervals = bedtimes
+                    .iter()
+                    .filter_map(|x| x.next(now))
+                    .map(|x| x..(x + c.duration))
+                    .collect::<IntervalSet<_>>();
+                (user_id, intervals)
+            })
+            .collect::<BTreeMap<_, _>>()
+    })
+    .await
 }
 
 async fn start_or_stop_bedtime(
     ctx: Context,
-    data: impl With<ConfigT> + State<StateT> + State<GuildId>,
+    data: &(impl With<ConfigT> + State<StateT> + State<GuildId>),
     (user_id, sleep_or_wake): (UserId, StartOrStopBedtime),
 ) -> Result<()> {
     let guild_id: GuildId = *data.state();
@@ -114,25 +117,28 @@ async fn start_or_stop_bedtime(
         StartOrStopBedtime::Stop => stop_bedtime(ctx, data, member).await?,
     }
 
+    let state: Arc<StateT> = data.state();
+    {
+        let mut intervals = state.bedtime_intervals.write().await;
+        *intervals = get_bedtime_intervals_and_prune(data).await?;
+    }
+
     Ok(())
 }
 
 async fn stop_bedtime(
     ctx: Context,
-    data: impl With<ConfigT> + State<StateT> + State<GuildId>,
+    data: &(impl With<ConfigT> + State<StateT> + State<GuildId>),
     member: Member,
 ) -> Result<()> {
     let name = member.display_name();
     let state: Arc<StateT> = data.state();
     let cfg = data.with_ok(|cfg| cfg.clone()).await?;
 
-    if let Some(bedtime_range) = state
-        .bedtime_intervals
-        .get()
-        .some()?
-        .get(&member.user.id)
-        .and_then(|bedtimes| bedtimes.find(Utc::now()))
-    {
+    if let Some(bedtime_range) = {
+        let interval_sets = state.bedtime_intervals.read().await;
+        interval_sets.get(&member.user.id).and_then(|bedtimes| bedtimes.find(Utc::now()))
+    } {
         let end = bedtime_range.end;
         tracing::info!("🌙 {name} should still be sleeping until {end}, waiting until then");
         let timer = end.signed_duration_since(Utc::now());
@@ -159,7 +165,7 @@ async fn stop_bedtime(
 
 async fn start_bedtime(
     ctx: Context,
-    data: impl With<ConfigT> + State<StateT> + State<GuildId>,
+    data: &(impl With<ConfigT> + State<StateT> + State<GuildId>),
     member: Member,
 ) -> Result<()> {
     let name = member.display_name();

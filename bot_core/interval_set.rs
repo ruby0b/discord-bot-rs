@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct IntervalSet<T: Ord + Copy> {
     intervals: Vec<Range<T>>,
 }

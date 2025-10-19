@@ -5,6 +5,8 @@ pub mod autocomplete;
 pub mod choice_parameters;
 pub mod color_parameter;
 pub mod hash_store;
+pub mod interval_set;
+pub mod iso_weekday;
 pub mod result_ext;
 pub mod serde;
 pub mod template;
