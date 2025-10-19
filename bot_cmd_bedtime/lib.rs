@@ -1,20 +1,19 @@
-/*
-TODO add/remove bedtimes
-/add time Option<date>
-/add should display the bedtime with toggle buttons for each weekday
-*/
+mod bedtime;
 
+use crate::bedtime::Bedtime;
 use bot_core::interval_set::IntervalSet;
-use bot_core::iso_weekday::IsoWeekday;
 use bot_core::serde::LiteralRegex;
 use bot_core::{CmdContext, OptionExt as _, State, With, get_member, naive_time_to_next_datetime};
-use chrono::{DateTime, Datelike, Days, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Utc};
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Utc};
 use eyre::{OptionExt as _, Result};
+use poise::CreateReply;
 use poise::serenity_prelude::all::{GuildId, UserId};
 use poise::serenity_prelude::prelude::Context;
 use poise::serenity_prelude::{Member, RoleId};
 use std::collections::{BTreeMap, BTreeSet};
-use std::iter;
+
+pub const TOGGLE_WEEKDAY_BUTTON_ID: &str = "bedtime.weekday";
+pub const DELETE_BUTTON_ID: &str = "bedtime.delete";
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
 pub struct ConfigT {
@@ -24,29 +23,6 @@ pub struct ConfigT {
     ignored_vc_description: Option<LiteralRegex>,
     role: Option<RoleId>,
     users: BTreeMap<UserId, BTreeSet<Bedtime>>,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Bedtime {
-    first: DateTime<Utc>,
-    repeat: BTreeSet<IsoWeekday>,
-}
-
-impl Bedtime {
-    fn currently_relevant_bedtimes(&self, now: DateTime<Utc>) -> BTreeSet<DateTime<Utc>> {
-        let today = now.date_naive().and_time(self.first.time()).and_utc();
-        let repeats = [today - Days::new(1), today]
-            .into_iter()
-            .chain((1..=7).map(|offset| today + Days::new(offset)))
-            .filter(|&bedtime| {
-                bedtime > self.first && self.repeat.contains(&IsoWeekday(bedtime.weekday()))
-            });
-        iter::once(self.first).chain(repeats).collect()
-    }
-
-    fn next(&self, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
-        self.currently_relevant_bedtimes(now).into_iter().find(|&bedtime| bedtime > now)
-    }
 }
 
 /// Set a bedtime
@@ -67,10 +43,13 @@ pub async fn bedtime<D: With<ConfigT>>(
         },
         repeat: Default::default(),
     };
+
     ctx.data()
         .with_mut_ok(|cfg| cfg.users.entry(ctx.author().id).or_default().insert(bedtime.clone()))
         .await?;
-    ctx.say(format!("Added `{bedtime:?}`")).await?;
+
+    ctx.send(CreateReply::new().embed(bedtime.embed()).components(bedtime.components())).await?;
+
     Ok(())
 }
 
