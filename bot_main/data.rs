@@ -17,6 +17,20 @@ pub struct GuildData(
     Arc<bot_cmd_economy::StateT>,
 );
 
+impl GuildData {
+    pub fn new(guild_id: GuildId) -> Self {
+        GuildData(
+            Arc::new(guild_id),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        )
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default, AsRef, AsMut)]
 pub struct GuildConfigT {
     #[serde(default)]

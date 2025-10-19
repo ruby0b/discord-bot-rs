@@ -42,6 +42,7 @@ async fn main() -> Result<()> {
             bot_cmd_ask::ask(),
             bot_cmd_ask::delete_ask_defaults(),
             bot_cmd_ask::new_ask_defaults(),
+            bot_cmd_bedtime::bedtime(),
             bot_cmd_eval::d2(),
             bot_cmd_eval::math(),
             bot_cmd_eval::typst(),
@@ -171,18 +172,20 @@ async fn main() -> Result<()> {
             Box::pin(async move {
                 tracing::info!("Logged in as {}", ready.user.name);
 
-                let data = data::GuildData::default();
+                let data = data::GuildData::new(cfg_guild);
 
                 let config: &Arc<crate::config::GuildConfig<_>> = data.as_ref();
                 tokio::spawn(config.clone().write_periodically(ctx.clone()));
                 config.init((&ctx.cache, &ctx.http), Some(cfg_guild), cfg_channel).await?;
 
                 tracing::debug!("Pre-fetching TTS clips");
-                bot_cmd_tts::get_clips(ctx, &data.clone()).await?;
+                bot_cmd_tts::get_clips(ctx, &data).await?;
 
                 bot_core::hash_store::purge_expired().await?;
 
                 bot_cmd_ask::load_asks(ctx, &data).await?;
+
+                tokio::spawn(bot_cmd_bedtime::bedtime_loop(ctx.clone(), data.clone()));
 
                 Ok(data)
             })

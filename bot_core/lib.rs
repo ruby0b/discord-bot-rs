@@ -12,6 +12,7 @@ pub mod serde;
 pub mod template;
 pub mod timer_queue;
 
+use chrono::{DateTime, Local, NaiveDateTime, NaiveTime, TimeZone as _, Utc};
 use dashmap::DashMap;
 use eyre::{OptionExt as _, Result};
 use poise::CreateReply;
@@ -202,4 +203,10 @@ pub fn to_snd<K, V>(f: impl Fn(&K) -> V) -> impl Fn(K) -> (K, V) {
         let value = f(&key);
         (key, value)
     }
+}
+
+pub fn naive_time_to_next_datetime(naive_time: NaiveTime) -> Option<DateTime<Local>> {
+    let now = Utc::now().naive_local();
+    let date = if naive_time > now.time() { now.date() } else { now.date().succ_opt().unwrap() };
+    Local.from_local_datetime(&NaiveDateTime::new(date, naive_time)).single()
 }

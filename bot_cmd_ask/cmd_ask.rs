@@ -1,8 +1,8 @@
 use crate::ConfigT;
 use crate::ask::Ask;
 use crate::schedule_ask_updates::schedule_ask_updates;
-use bot_core::{CmdContext, With};
-use chrono::{DateTime, Local, NaiveDateTime, TimeZone as _, Utc};
+use bot_core::{CmdContext, With, naive_time_to_next_datetime};
+use chrono::{NaiveTime, Utc};
 use eyre::Result;
 use poise::serenity_prelude::CreateAllowedMentions;
 use url::Url;
@@ -16,7 +16,7 @@ pub async fn ask<D: With<ConfigT>>(
     #[description = "Maximum number of players"] max_players: Option<u32>,
     #[description = "Start time"]
     #[autocomplete = bot_core::autocomplete::time]
-    start_time: Option<chrono::NaiveTime>,
+    start_time: Option<NaiveTime>,
     #[description = "Link to the game"] url: Option<Url>,
     #[description = "Game description"] description: Option<String>,
 ) -> Result<()> {
@@ -74,10 +74,4 @@ pub async fn ask<D: With<ConfigT>>(
     schedule_ask_updates(ctx.serenity_context(), ctx.data(), &ask, msg_id, expiration).await;
 
     Ok(())
-}
-
-fn naive_time_to_next_datetime(naive_time: chrono::NaiveTime) -> Option<DateTime<Local>> {
-    let now = Utc::now().naive_local();
-    let date = if naive_time > now.time() { now.date() } else { now.date().succ_opt().unwrap() };
-    Local.from_local_datetime(&NaiveDateTime::new(date, naive_time)).single()
 }
