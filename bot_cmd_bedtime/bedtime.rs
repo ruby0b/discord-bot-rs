@@ -73,3 +73,59 @@ impl Bedtime {
             .label(weekday_str)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use chrono::{TimeDelta, TimeZone};
+
+    #[test]
+    fn currently_relevant_bedtimes_when_after_first() {
+        let today = Utc.with_ymd_and_hms(2025, 1, 1, 1, 15, 0).unwrap();
+        let bedtime2 = Bedtime {
+            user: Default::default(),
+            first: today - TimeDelta::days(10),
+            repeat: [Weekday::Tue, Weekday::Wed, Weekday::Sun]
+                .into_iter()
+                .map(IsoWeekday)
+                .collect(),
+        };
+        assert_eq!(
+            bedtime2.currently_relevant_bedtimes(today - TimeDelta::minutes(1)),
+            [
+                Utc.with_ymd_and_hms(2024, 12, 22, 1, 15, 0).unwrap(),
+                Utc.with_ymd_and_hms(2024, 12, 31, 1, 15, 0).unwrap(),
+                Utc.with_ymd_and_hms(2025, 1, 1, 1, 15, 0).unwrap(),
+                Utc.with_ymd_and_hms(2025, 1, 5, 1, 15, 0).unwrap(),
+                Utc.with_ymd_and_hms(2025, 1, 7, 1, 15, 0).unwrap(),
+                Utc.with_ymd_and_hms(2025, 1, 8, 1, 15, 0).unwrap()
+            ]
+            .into_iter()
+            .collect::<BTreeSet<_>>()
+        );
+    }
+
+    #[test]
+    fn currently_relevant_bedtimes_when_before_first() {
+        let today = Utc.with_ymd_and_hms(2025, 1, 1, 1, 15, 0).unwrap();
+        let bedtime = Bedtime {
+            user: Default::default(),
+            first: today,
+            repeat: [Weekday::Tue, Weekday::Wed, Weekday::Sun]
+                .into_iter()
+                .map(IsoWeekday)
+                .collect(),
+        };
+        assert_eq!(
+            bedtime.currently_relevant_bedtimes(today - TimeDelta::minutes(1)),
+            [
+                Utc.with_ymd_and_hms(2025, 1, 1, 1, 15, 0).unwrap(),
+                Utc.with_ymd_and_hms(2025, 1, 5, 1, 15, 0).unwrap(),
+                Utc.with_ymd_and_hms(2025, 1, 7, 1, 15, 0).unwrap(),
+                Utc.with_ymd_and_hms(2025, 1, 8, 1, 15, 0).unwrap()
+            ]
+            .into_iter()
+            .collect::<BTreeSet<_>>()
+        );
+    }
+}
