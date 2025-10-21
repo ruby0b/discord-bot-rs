@@ -2,13 +2,15 @@ use crate::{DELETE_BUTTON_ID, TOGGLE_WEEKDAY_BUTTON_ID};
 use bot_core::iso_weekday::IsoWeekday;
 use chrono::{DateTime, Datelike, Days, Utc, Weekday};
 use poise::serenity_prelude::{
-    ButtonStyle, Color, CreateActionRow, CreateButton, CreateEmbed, ReactionType,
+    ButtonStyle, Color, CreateActionRow, CreateButton, CreateEmbed, ReactionType, UserId,
 };
 use std::collections::BTreeSet;
 use std::iter;
+use uuid::Uuid;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Bedtime {
+    pub(crate) user: UserId,
     pub(crate) first: DateTime<Utc>,
     pub(crate) repeat: BTreeSet<IsoWeekday>,
 }
@@ -41,18 +43,18 @@ impl Bedtime {
             .color(Color::DARK_PURPLE)
     }
 
-    pub(crate) fn components(&self) -> Vec<CreateActionRow> {
+    pub(crate) fn components(&self, id: Uuid) -> Vec<CreateActionRow> {
         vec![
             CreateActionRow::Buttons(vec![
-                self.weekday_button(Weekday::Mon),
-                self.weekday_button(Weekday::Tue),
-                self.weekday_button(Weekday::Wed),
-                self.weekday_button(Weekday::Thu),
-                self.weekday_button(Weekday::Fri),
+                self.weekday_button(id, Weekday::Mon),
+                self.weekday_button(id, Weekday::Tue),
+                self.weekday_button(id, Weekday::Wed),
+                self.weekday_button(id, Weekday::Thu),
+                self.weekday_button(id, Weekday::Fri),
             ]),
             CreateActionRow::Buttons(vec![
-                self.weekday_button(Weekday::Sat),
-                self.weekday_button(Weekday::Sun),
+                self.weekday_button(id, Weekday::Sat),
+                self.weekday_button(id, Weekday::Sun),
                 CreateButton::new(DELETE_BUTTON_ID)
                     .style(ButtonStyle::Danger)
                     .emoji(ReactionType::Unicode("🗑️".to_string())),
@@ -60,13 +62,14 @@ impl Bedtime {
         ]
     }
 
-    fn weekday_button(&self, weekday: Weekday) -> CreateButton {
-        CreateButton::new(format!("{TOGGLE_WEEKDAY_BUTTON_ID}:{}", weekday.num_days_from_monday()))
+    fn weekday_button(&self, id: Uuid, weekday: Weekday) -> CreateButton {
+        let weekday_str = weekday.to_string();
+        CreateButton::new(format!("{TOGGLE_WEEKDAY_BUTTON_ID}:{id}:{weekday_str}"))
             .style(if self.repeat.contains(&IsoWeekday(weekday)) {
                 ButtonStyle::Primary
             } else {
                 ButtonStyle::Secondary
             })
-            .label(weekday.to_string())
+            .label(weekday_str)
     }
 }

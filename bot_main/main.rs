@@ -126,6 +126,13 @@ async fn main() -> Result<()> {
                             bot_cmd_ask::LEAVE_SERVER_BUTTON_ID => {
                                 bot_cmd_ask::leave_server(framework, component).await?;
                             }
+                            bot_cmd_bedtime::TOGGLE_WEEKDAY_BUTTON_ID => {
+                                bot_cmd_bedtime::toggle_weekday_button(framework, component, param)
+                                    .await?;
+                            }
+                            bot_cmd_bedtime::DELETE_BUTTON_ID => {
+                                bot_cmd_bedtime::delete_button(framework, component, param).await?;
+                            }
                             bot_cmd_roles::SHOW_ROLE_SELECTION_ID => {
                                 bot_cmd_roles::show_role_selection(framework, component).await?;
                             }

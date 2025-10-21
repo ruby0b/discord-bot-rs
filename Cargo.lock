@@ -429,11 +429,13 @@ dependencies = [
  "dashmap 6.1.0",
  "derive_more 2.0.1",
  "eyre",
+ "itertools",
  "poise",
  "sensible",
  "serde",
  "tokio 1.45.1",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

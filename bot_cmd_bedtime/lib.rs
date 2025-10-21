@@ -1,16 +1,20 @@
 mod bedtime;
+mod buttons;
 
 use crate::bedtime::Bedtime;
+pub use crate::buttons::*;
 use bot_core::interval_set::IntervalSet;
 use bot_core::serde::LiteralRegex;
 use bot_core::{CmdContext, OptionExt as _, State, With, get_member, naive_time_to_next_datetime};
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Utc};
 use eyre::{OptionExt as _, Result};
+use itertools::Itertools;
 use poise::CreateReply;
 use poise::serenity_prelude::all::{GuildId, UserId};
 use poise::serenity_prelude::prelude::Context;
 use poise::serenity_prelude::{Member, RoleId};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+use uuid::Uuid;
 
 pub const TOGGLE_WEEKDAY_BUTTON_ID: &str = "bedtime.weekday";
 pub const DELETE_BUTTON_ID: &str = "bedtime.delete";
@@ -22,7 +26,7 @@ pub struct ConfigT {
     duration: TimeDelta,
     ignored_vc_description: Option<LiteralRegex>,
     role: Option<RoleId>,
-    users: BTreeMap<UserId, BTreeSet<Bedtime>>,
+    bedtimes: BTreeMap<Uuid, Bedtime>,
 }
 
 /// Set a bedtime
@@ -37,6 +41,7 @@ pub async fn bedtime<D: With<ConfigT>>(
     date: Option<NaiveDate>,
 ) -> Result<()> {
     let bedtime = Bedtime {
+        user: ctx.author().id,
         first: match date {
             Some(d) => NaiveDateTime::new(d, time).and_utc(),
             None => naive_time_to_next_datetime(time).ok_or_eyre("Gap in time")?.to_utc(),
@@ -44,11 +49,16 @@ pub async fn bedtime<D: With<ConfigT>>(
         repeat: Default::default(),
     };
 
-    ctx.data()
-        .with_mut_ok(|cfg| cfg.users.entry(ctx.author().id).or_default().insert(bedtime.clone()))
+    let id = ctx
+        .data()
+        .with_mut_ok(|cfg| {
+            let id = Uuid::new_v4();
+            cfg.bedtimes.insert(id, bedtime.clone());
+            id
+        })
         .await?;
 
-    ctx.send(CreateReply::new().embed(bedtime.embed()).components(bedtime.components())).await?;
+    ctx.send(CreateReply::new().embed(bedtime.embed()).components(bedtime.components(id))).await?;
 
     Ok(())
 }
@@ -91,19 +101,25 @@ async fn get_bedtime_intervals_and_prune(
     now: DateTime<Utc>,
 ) -> Result<BTreeMap<UserId, IntervalSet<DateTime<Utc>>>> {
     data.with_mut_ok(|cfg| {
-        cfg.users
-            .iter_mut()
-            .map(|(&user_id, bedtimes)| {
+        let interval_sets = cfg
+            .bedtimes
+            .values()
+            .chunk_by(|bedtime| bedtime.user)
+            .into_iter()
+            .map(|(user_id, bedtimes)| {
                 let intervals = bedtimes
-                    .iter()
+                    .into_iter()
                     .flat_map(|x| x.currently_relevant_bedtimes(now))
                     .map(|x| x..(x + cfg.duration))
                     .collect::<IntervalSet<_>>();
-                // prune outdated bedtimes that don't repeat
-                bedtimes.retain(|x| x.first >= (now - cfg.duration) || !x.repeat.is_empty());
                 (user_id, intervals)
             })
-            .collect::<BTreeMap<_, _>>()
+            .collect::<BTreeMap<_, _>>();
+
+        // prune outdated bedtimes that don't repeat
+        cfg.bedtimes.retain(|_, b| b.first >= (now - cfg.duration) || !b.repeat.is_empty());
+
+        interval_sets
     })
     .await
 }
