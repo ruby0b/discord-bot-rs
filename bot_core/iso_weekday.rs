@@ -11,6 +11,6 @@ impl PartialOrd for IsoWeekday {
 
 impl Ord for IsoWeekday {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.0.number_from_monday().cmp(&other.0.num_days_from_monday())
+        self.0.number_from_monday().cmp(&other.0.number_from_monday())
     }
 }

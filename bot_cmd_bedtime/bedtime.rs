@@ -38,7 +38,7 @@ impl Bedtime {
             .find(|&bedtime| bedtime > now)
             .unwrap_or(self.first);
         CreateEmbed::new()
-            .title("Bedtime")
+            .title("🌙 Bedtime")
             .description(format!("<t:{}:R>", next.timestamp()))
             .color(Color::DARK_PURPLE)
     }
@@ -55,7 +55,7 @@ impl Bedtime {
             CreateActionRow::Buttons(vec![
                 self.weekday_button(id, Weekday::Sat),
                 self.weekday_button(id, Weekday::Sun),
-                CreateButton::new(DELETE_BUTTON_ID)
+                CreateButton::new(format!("{DELETE_BUTTON_ID}:{id}"))
                     .style(ButtonStyle::Danger)
                     .emoji(ReactionType::Unicode("🗑️".to_string())),
             ]),

@@ -23,7 +23,10 @@ pub async fn toggle_weekday_button(
         .with_mut_ok(|cfg| {
             cfg.bedtimes.get_mut(&id).map(|b| {
                 if !b.repeat.remove(&weekday) {
+                    println!("inserting");
                     b.repeat.insert(weekday);
+                } else {
+                    println!("removed");
                 }
                 b.clone()
             })
