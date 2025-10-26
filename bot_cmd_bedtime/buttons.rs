@@ -2,9 +2,9 @@ use crate::ConfigT;
 use bot_core::iso_weekday::IsoWeekday;
 use bot_core::{CreateReplyExt, EvtContext, OptionExt as _, With};
 use chrono::{Utc, Weekday};
-use eyre::{OptionExt, Result};
+use eyre::{OptionExt, Result, ensure};
 use poise::CreateReply;
-use poise::serenity_prelude::{ComponentInteraction, ComponentInteractionDataKind};
+use poise::serenity_prelude::{Color, ComponentInteraction, ComponentInteractionDataKind};
 use uuid::Uuid;
 
 pub async fn toggle_weekday_button(
@@ -21,16 +21,15 @@ pub async fn toggle_weekday_button(
     tracing::info!("Toggling {} on bedtime {id}", weekday.0);
     let bedtime = ctx
         .user_data
-        .with_mut_ok(|cfg| {
-            cfg.bedtimes.get_mut(&id).map(|b| {
-                if !b.repeat.remove(&weekday) {
-                    b.repeat.insert(weekday);
-                }
-                b.clone()
-            })
+        .with_mut(|cfg| {
+            let bedtime = cfg.bedtimes.get_mut(&id).ok_or_eyre("Bedtime no longer exists")?;
+            ensure!(component.user.id == bedtime.user, "That's not your own bedtime");
+            if !bedtime.repeat.remove(&weekday) {
+                bedtime.repeat.insert(weekday);
+            }
+            Ok(bedtime.clone())
         })
-        .await?
-        .ok_or_eyre("Bedtime no longer exists")?;
+        .await?;
 
     bedtime
         .reply(id, ctx.user_data, Utc::now())
@@ -53,14 +52,18 @@ pub async fn delete_button(
     tracing::info!("Removing bedtime {id}");
     let bedtime = ctx
         .user_data
-        .with_mut_ok(|cfg| cfg.bedtimes.remove(&id))
-        .await?
-        .ok_or_eyre("Bedtime no longer exists")?;
+        .with_mut(|cfg| {
+            let bedtime = cfg.bedtimes.get(&id).cloned().ok_or_eyre("Bedtime no longer exists")?;
+            ensure!(component.user.id == bedtime.user, "That's not your own bedtime");
+            cfg.bedtimes.remove(&id);
+            Ok(bedtime)
+        })
+        .await?;
 
     let now = Utc::now();
     CreateReply::new()
-        .embed(bedtime.embed(now))
-        .components(bedtime.components(id, ctx.user_data, now).await?)
+        .embed(bedtime.embed(now).color(Color::DARKER_GREY))
+        .components(vec![bedtime.select_menu_component(id, ctx.user_data, now).await?])
         .edit_message(ctx.serenity_context, &component.message)
         .await?;
 
@@ -81,9 +84,12 @@ pub async fn select_bedtime(
 
     let bedtime = ctx
         .user_data
-        .with_mut_ok(|cfg| cfg.bedtimes.remove(&id))
-        .await?
-        .ok_or_eyre("Bedtime no longer exists")?;
+        .with_mut(|cfg| {
+            let bedtime = cfg.bedtimes.get(&id).cloned().ok_or_eyre("Bedtime no longer exists")?;
+            ensure!(component.user.id == bedtime.user, "That's not your own bedtime");
+            Ok(bedtime)
+        })
+        .await?;
 
     bedtime
         .reply(id, ctx.user_data, Utc::now())

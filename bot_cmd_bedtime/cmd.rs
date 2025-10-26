@@ -48,6 +48,7 @@ pub async fn bedtimes<D: With<ConfigT>>(ctx: CmdContext<'_, D>) -> Result<()> {
         .with_mut_ok(|cfg| {
             cfg.bedtimes
                 .iter()
+                .filter(|(_, bedtime)| bedtime.user == ctx.author().id)
                 .min_by_key(|(_, bedtime)| bedtime.next(now))
                 .map(|(id, bedtime)| (*id, bedtime.clone()))
         })

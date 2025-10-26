@@ -46,7 +46,7 @@ async fn all_bedtimes(
 }
 
 pub async fn bedtime_loop(ctx: Context, data: impl With<ConfigT> + State<GuildId>) {
-    let mut interval = tokio::time::interval(std::time::Duration::from_mins(1));
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
     interval.tick().await;
     loop {
         if let Err(error) = enforce_and_lift_bedtimes(&ctx, &data).await {
