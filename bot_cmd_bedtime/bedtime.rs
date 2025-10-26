@@ -1,10 +1,16 @@
-use crate::{DELETE_BUTTON_ID, TOGGLE_WEEKDAY_BUTTON_ID};
+use crate::{ConfigT, DELETE_BUTTON_ID, SELECT_BEDTIME_ID, TOGGLE_WEEKDAY_BUTTON_ID, all_bedtimes};
+use bot_core::With;
 use bot_core::iso_weekday::IsoWeekday;
-use chrono::{DateTime, Datelike, Days, Utc, Weekday};
+use chrono::{DateTime, Datelike, Days, Local, TimeDelta, TimeZone, Utc, Weekday};
+use eyre::Result;
+use itertools::Itertools as _;
+use poise::CreateReply;
 use poise::serenity_prelude::{
-    ButtonStyle, Color, CreateActionRow, CreateButton, CreateEmbed, ReactionType, UserId,
+    ButtonStyle, Color, CreateActionRow, CreateButton, CreateEmbed, CreateSelectMenu,
+    CreateSelectMenuKind, CreateSelectMenuOption, ReactionType, UserId,
 };
 use std::collections::BTreeSet;
+use std::fmt::Display;
 use std::iter;
 use uuid::Uuid;
 
@@ -24,42 +30,88 @@ impl Bedtime {
         let repeats = [today - Days::new(1), today]
             .into_iter()
             .chain((1..=7).map(|offset| today + Days::new(offset)))
-            .filter(|&bedtime| {
-                bedtime > self.first && self.repeat.contains(&IsoWeekday(bedtime.weekday()))
-            });
+            .filter(|&bedtime| bedtime > self.first)
+            .filter(|&bedtime| self.repeat.contains(&IsoWeekday(bedtime.weekday())));
         iter::once(self.first).chain(repeats).collect()
     }
 
-    pub(crate) fn embed(&self) -> CreateEmbed {
-        let now = Utc::now();
-        let next = self
-            .currently_relevant_bedtimes(now)
+    pub(crate) fn next(&self, now: DateTime<Utc>) -> DateTime<Utc> {
+        self.currently_relevant_bedtimes(now)
             .into_iter()
             .find(|&bedtime| bedtime > now)
-            .unwrap_or(self.first);
+            .unwrap_or(self.first)
+    }
+
+    pub(crate) async fn reply(
+        &self,
+        id: Uuid,
+        data: &impl With<ConfigT>,
+        now: DateTime<Utc>,
+    ) -> Result<CreateReply> {
+        Ok(CreateReply::new()
+            .embed(self.embed(now))
+            .components(self.components(id, data, now).await?))
+    }
+
+    pub(crate) fn embed(&self, now: DateTime<Utc>) -> CreateEmbed {
         CreateEmbed::new()
-            .title("🌙 Bedtime")
-            .description(format!("<t:{}:R>", next.timestamp()))
+            .title(format!("🌙 Bedtime – {}", format_datetime(self.next(now), now, &Local)))
+            .description(format!("<t:{}:R>", self.next(Utc::now()).timestamp()))
             .color(Color::DARK_PURPLE)
     }
 
-    pub(crate) fn components(&self, id: Uuid) -> Vec<CreateActionRow> {
-        vec![
-            CreateActionRow::Buttons(vec![
-                self.weekday_button(id, Weekday::Mon),
-                self.weekday_button(id, Weekday::Tue),
-                self.weekday_button(id, Weekday::Wed),
-                self.weekday_button(id, Weekday::Thu),
-                self.weekday_button(id, Weekday::Fri),
-            ]),
-            CreateActionRow::Buttons(vec![
-                self.weekday_button(id, Weekday::Sat),
-                self.weekday_button(id, Weekday::Sun),
-                CreateButton::new(format!("{DELETE_BUTTON_ID}:{id}"))
-                    .style(ButtonStyle::Danger)
-                    .emoji(ReactionType::Unicode("🗑️".to_string())),
-            ]),
-        ]
+    pub(crate) async fn components(
+        &self,
+        id: Uuid,
+        data: &impl With<ConfigT>,
+        now: DateTime<Utc>,
+    ) -> Result<Vec<CreateActionRow>> {
+        let mut components = vec![];
+
+        // add a selection menu to view other bedtimes
+        let other_bedtimes = all_bedtimes(data, self.user).await?;
+        if !other_bedtimes.is_empty() {
+            let options = other_bedtimes
+                .into_iter()
+                .filter(|(other_id, _)| *other_id != id)
+                .map(|(other_id, bedtime)| {
+                    let mut opt = CreateSelectMenuOption::new(
+                        format_datetime(bedtime.next(now), now, &Local),
+                        other_id,
+                    );
+                    if !bedtime.repeat.is_empty() {
+                        let repeats = bedtime.repeat.iter().map(|wd| wd.0.to_string()).join(", ");
+                        opt = opt.description(format!("Repeats on: {repeats}"))
+                    }
+                    opt
+                })
+                .collect_vec();
+
+            components.push(CreateActionRow::SelectMenu(
+                CreateSelectMenu::new(SELECT_BEDTIME_ID, CreateSelectMenuKind::String { options })
+                    .min_values(1)
+                    .max_values(1)
+                    .placeholder("View other bedtimes..."),
+            ))
+        }
+
+        components.push(CreateActionRow::Buttons(vec![
+            self.weekday_button(id, Weekday::Mon),
+            self.weekday_button(id, Weekday::Tue),
+            self.weekday_button(id, Weekday::Wed),
+            self.weekday_button(id, Weekday::Thu),
+            self.weekday_button(id, Weekday::Fri),
+        ]));
+
+        components.push(CreateActionRow::Buttons(vec![
+            self.weekday_button(id, Weekday::Sat),
+            self.weekday_button(id, Weekday::Sun),
+            CreateButton::new(format!("{DELETE_BUTTON_ID}:{id}"))
+                .style(ButtonStyle::Danger)
+                .emoji(ReactionType::Unicode("🗑️".to_string())),
+        ]));
+
+        Ok(components)
     }
 
     fn weekday_button(&self, id: Uuid, weekday: Weekday) -> CreateButton {
@@ -72,6 +124,28 @@ impl Bedtime {
             })
             .label(weekday_str)
     }
+}
+
+fn format_datetime<TZ>(dt: DateTime<Utc>, now: DateTime<Utc>, display_tz: &TZ) -> String
+where
+    TZ: TimeZone,
+    TZ::Offset: Display,
+{
+    dt.with_timezone(display_tz)
+        .format(
+            if dt.num_days_from_ce() == now.num_days_from_ce() || dt < now + TimeDelta::hours(12) {
+                "%H:%M"
+            } else if dt.num_days_from_ce() - now.num_days_from_ce() == 1 {
+                "Tomorrow at %H:%M"
+            } else if dt < now + TimeDelta::weeks(1) {
+                "%A at %H:%M"
+            } else if dt.year() == now.year() {
+                "%A, %d.%m. at %H:%M"
+            } else {
+                "%A, %d.%m.%Y at %H:%M"
+            },
+        )
+        .to_string()
 }
 
 #[cfg(test)]

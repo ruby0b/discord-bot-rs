@@ -43,6 +43,7 @@ async fn main() -> Result<()> {
             bot_cmd_ask::delete_ask_defaults(),
             bot_cmd_ask::new_ask_defaults(),
             bot_cmd_bedtime::bedtime(),
+            bot_cmd_bedtime::bedtimes(),
             bot_cmd_eval::d2(),
             bot_cmd_eval::math(),
             bot_cmd_eval::typst(),
@@ -132,6 +133,9 @@ async fn main() -> Result<()> {
                             }
                             bot_cmd_bedtime::DELETE_BUTTON_ID => {
                                 bot_cmd_bedtime::delete_button(framework, component, param).await?;
+                            }
+                            bot_cmd_bedtime::SELECT_BEDTIME_ID => {
+                                bot_cmd_bedtime::select_bedtime(framework, component).await?;
                             }
                             bot_cmd_roles::SHOW_ROLE_SELECTION_ID => {
                                 bot_cmd_roles::show_role_selection(framework, component).await?;

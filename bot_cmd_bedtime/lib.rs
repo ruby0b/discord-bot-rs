@@ -1,15 +1,16 @@
 mod bedtime;
 mod buttons;
+mod cmd;
 
 use crate::bedtime::Bedtime;
 pub use crate::buttons::*;
+pub use crate::cmd::*;
 use bot_core::interval_set::IntervalSet;
 use bot_core::serde::LiteralRegex;
-use bot_core::{CmdContext, OptionExt as _, State, With, get_member, naive_time_to_next_datetime};
-use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeDelta, Utc};
-use eyre::{OptionExt as _, Result};
+use bot_core::{OptionExt as _, State, With, get_member};
+use chrono::{DateTime, TimeDelta, Utc};
+use eyre::Result;
 use itertools::Itertools;
-use poise::CreateReply;
 use poise::serenity_prelude::all::{GuildId, UserId};
 use poise::serenity_prelude::prelude::Context;
 use poise::serenity_prelude::{Member, RoleId};
@@ -18,6 +19,7 @@ use uuid::Uuid;
 
 pub const TOGGLE_WEEKDAY_BUTTON_ID: &str = "bedtime.weekday";
 pub const DELETE_BUTTON_ID: &str = "bedtime.delete";
+pub const SELECT_BEDTIME_ID: &str = "bedtime.select";
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
 pub struct ConfigT {
@@ -29,38 +31,18 @@ pub struct ConfigT {
     bedtimes: BTreeMap<Uuid, Bedtime>,
 }
 
-/// Set a bedtime
-#[poise::command(slash_command, guild_only)]
-pub async fn bedtime<D: With<ConfigT>>(
-    ctx: CmdContext<'_, D>,
-    #[description = "Time"]
-    #[autocomplete = bot_core::autocomplete::time]
-    time: NaiveTime,
-    #[description = "Date"]
-    // todo autocomplete
-    date: Option<NaiveDate>,
-) -> Result<()> {
-    let bedtime = Bedtime {
-        user: ctx.author().id,
-        first: match date {
-            Some(d) => NaiveDateTime::new(d, time).and_utc(),
-            None => naive_time_to_next_datetime(time).ok_or_eyre("Gap in time")?.to_utc(),
-        },
-        repeat: Default::default(),
-    };
-
-    let id = ctx
-        .data()
-        .with_mut_ok(|cfg| {
-            let id = Uuid::new_v4();
-            cfg.bedtimes.insert(id, bedtime.clone());
-            id
-        })
-        .await?;
-
-    ctx.send(CreateReply::new().embed(bedtime.embed()).components(bedtime.components(id))).await?;
-
-    Ok(())
+async fn all_bedtimes(
+    data: &impl With<ConfigT>,
+    user_id: UserId,
+) -> Result<BTreeMap<Uuid, Bedtime>> {
+    data.with_ok(|cfg| {
+        cfg.bedtimes
+            .iter()
+            .filter(|(_, b)| b.user == user_id)
+            .map(|(id, b)| (*id, b.clone()))
+            .collect()
+    })
+    .await
 }
 
 pub async fn bedtime_loop(ctx: Context, data: impl With<ConfigT> + State<GuildId>) {
