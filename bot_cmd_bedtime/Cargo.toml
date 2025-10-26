@@ -1,5 +1,5 @@
 [package]
-name = "bot_core"
+name = "bot_cmd_bedtime"
 version.workspace = true
 edition.workspace = true
 
@@ -7,24 +7,19 @@ edition.workspace = true
 path = "lib.rs"
 
 [dependencies]
-async-trait.workspace = true
+bot_core.path = "../bot_core"
 chrono.workspace = true
 dashmap.workspace = true
 derive_more.workspace = true
 eyre.workspace = true
-fancy-regex.workspace = true
-filetime.workspace = true
-futures.workspace = true
-hex.workspace = true
 itertools.workspace = true
 poise.workspace = true
+sensible.workspace = true
 serde.workspace = true
-sha2.workspace = true
-songbird.workspace = true
-symphonia.workspace = true
 tokio.workspace = true
-tokio-util.workspace = true
 tracing.workspace = true
+uuid.workspace = true
 
 [lints]
 workspace = true
+

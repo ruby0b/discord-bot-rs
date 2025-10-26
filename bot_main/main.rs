@@ -42,6 +42,8 @@ async fn main() -> Result<()> {
             bot_cmd_ask::ask(),
             bot_cmd_ask::delete_ask_defaults(),
             bot_cmd_ask::new_ask_defaults(),
+            bot_cmd_bedtime::bedtime(),
+            bot_cmd_bedtime::bedtimes(),
             bot_cmd_eval::d2(),
             bot_cmd_eval::math(),
             bot_cmd_eval::typst(),
@@ -125,6 +127,16 @@ async fn main() -> Result<()> {
                             bot_cmd_ask::LEAVE_SERVER_BUTTON_ID => {
                                 bot_cmd_ask::leave_server(framework, component).await?;
                             }
+                            bot_cmd_bedtime::TOGGLE_WEEKDAY_BUTTON_ID => {
+                                bot_cmd_bedtime::toggle_weekday_button(framework, component, param)
+                                    .await?;
+                            }
+                            bot_cmd_bedtime::DELETE_BUTTON_ID => {
+                                bot_cmd_bedtime::delete_button(framework, component, param).await?;
+                            }
+                            bot_cmd_bedtime::SELECT_BEDTIME_ID => {
+                                bot_cmd_bedtime::select_bedtime(framework, component).await?;
+                            }
                             bot_cmd_roles::SHOW_ROLE_SELECTION_ID => {
                                 bot_cmd_roles::show_role_selection(framework, component).await?;
                             }
@@ -171,18 +183,20 @@ async fn main() -> Result<()> {
             Box::pin(async move {
                 tracing::info!("Logged in as {}", ready.user.name);
 
-                let data = data::BotData::default();
+                let data = data::GuildData::new(cfg_guild);
 
-                let config: &Arc<crate::config::Config<_>> = data.as_ref();
+                let config: &Arc<crate::config::GuildConfig<_>> = data.as_ref();
                 tokio::spawn(config.clone().write_periodically(ctx.clone()));
                 config.init((&ctx.cache, &ctx.http), Some(cfg_guild), cfg_channel).await?;
 
                 tracing::debug!("Pre-fetching TTS clips");
-                bot_cmd_tts::get_clips(ctx, &data.clone()).await?;
+                bot_cmd_tts::get_clips(ctx, &data).await?;
 
                 bot_core::hash_store::purge_expired().await?;
 
                 bot_cmd_ask::load_asks(ctx, &data).await?;
+
+                tokio::spawn(bot_cmd_bedtime::bedtime_loop(ctx.clone(), data.clone()));
 
                 Ok(data)
             })

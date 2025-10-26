@@ -5,16 +5,20 @@ pub mod autocomplete;
 pub mod choice_parameters;
 pub mod color_parameter;
 pub mod hash_store;
+pub mod interval_set;
+pub mod iso_weekday;
 pub mod result_ext;
 pub mod serde;
 pub mod template;
+pub mod timer_queue;
 
+use chrono::{DateTime, Local, NaiveDateTime, NaiveTime, TimeZone as _, Utc};
 use dashmap::DashMap;
 use eyre::{OptionExt as _, Result};
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    Builder as _, ChannelId, ComponentInteraction, Context, CreateInteractionResponse, Member,
-    Message, ModalInteraction, VoiceState,
+    Builder as _, Cache, ChannelId, ComponentInteraction, Context, CreateInteractionResponse,
+    GuildId, Member, Message, ModalInteraction, UserId, VoiceState,
 };
 use std::hash::Hash;
 use std::sync::Arc;
@@ -65,15 +69,25 @@ where
 
 impl<T, Data> State<Data> for T where T: AsRef<Arc<Data>> + UserData {}
 
-/// Extension trait for `Option<T>`
 pub trait OptionExt<T> {
     /// Convert None to an error
     fn some(self) -> Result<T>;
+    fn inspect_none(self, f: impl FnOnce()) -> Self;
 }
 
 impl<T> OptionExt<T> for Option<T> {
     fn some(self) -> Result<T> {
         self.ok_or_eyre("Expected Some but got None")
+    }
+
+    fn inspect_none(self, f: impl FnOnce()) -> Self {
+        match self {
+            Some(x) => Some(x),
+            None => {
+                f();
+                None
+            }
+        }
     }
 }
 
@@ -107,6 +121,22 @@ pub async fn deferred_message(ctx: &Context, interaction: &ModalInteraction) -> 
         .execute(ctx, (interaction.id, &interaction.token))
         .await?;
     Ok(())
+}
+
+pub fn safe_name(ctx: &impl AsRef<Cache>, user_id: UserId) -> String {
+    user_id.to_user_cached(&ctx).map_or(user_id.to_string(), |u| u.display_name().to_string())
+}
+
+pub fn get_member(ctx: &impl AsRef<Cache>, guild_id: GuildId, user_id: UserId) -> Option<Member> {
+    let guild = ctx
+        .as_ref()
+        .guild(guild_id)
+        .inspect_none(|| tracing::warn!("Guild not in cache: {guild_id}"))?;
+    guild
+        .members
+        .get(&user_id)
+        .inspect_none(|| tracing::warn!("Member not found in cache: {guild_id}"))
+        .cloned()
 }
 
 // todo generalize ComponentInteraction and ModalInteraction
@@ -173,4 +203,10 @@ pub fn to_snd<K, V>(f: impl Fn(&K) -> V) -> impl Fn(K) -> (K, V) {
         let value = f(&key);
         (key, value)
     }
+}
+
+pub fn naive_time_to_next_datetime(naive_time: NaiveTime) -> Option<DateTime<Local>> {
+    let now = Utc::now().naive_local();
+    let date = if naive_time > now.time() { now.date() } else { now.date().succ_opt().unwrap() };
+    Local.from_local_datetime(&NaiveDateTime::new(date, naive_time)).single()
 }

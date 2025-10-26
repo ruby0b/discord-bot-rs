@@ -3,6 +3,7 @@ resolver = "3"
 members = [
     "bot_core",
     "bot_cmd_ask",
+    "bot_cmd_bedtime",
     "bot_cmd_ephemeral_voice_channels",
     "bot_cmd_eval",
     "bot_cmd_message",
@@ -58,6 +59,7 @@ songbird = { version = "0.5", features = ["builtin-queue"] }
 symphonia = { version = "0.5.2", features = ["mp3"] }
 thousands = "0.2.0"
 tokio = { version = "1.0", features = ["full"] }
+tokio-util = { version = "0.7.16", features = ["full"] }
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 url = "2.5.4"
