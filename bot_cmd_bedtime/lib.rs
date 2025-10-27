@@ -14,7 +14,7 @@ use itertools::Itertools;
 use poise::serenity_prelude::all::{GuildId, UserId};
 use poise::serenity_prelude::prelude::Context;
 use poise::serenity_prelude::{Member, RoleId};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use uuid::Uuid;
 
 pub const TOGGLE_WEEKDAY_BUTTON_ID: &str = "bedtime.weekday";
@@ -63,7 +63,8 @@ async fn enforce_and_lift_bedtimes(
     let guild_id: GuildId = *data.state();
 
     let now = Utc::now();
-    let intervals_by_user = get_bedtime_intervals_and_prune(data, now).await?;
+    let intervals_by_user = get_bedtime_intervals(data, now).await?;
+    prune_outdated_bedtimes(data, now).await?;
     let cfg = data.with_ok(|cfg| cfg.clone()).await?;
 
     for (&user_id, intervals) in intervals_by_user.iter() {
@@ -78,13 +79,12 @@ async fn enforce_and_lift_bedtimes(
     Ok(())
 }
 
-async fn get_bedtime_intervals_and_prune(
+async fn get_bedtime_intervals(
     data: &impl With<ConfigT>,
     now: DateTime<Utc>,
 ) -> Result<BTreeMap<UserId, IntervalSet<DateTime<Utc>>>> {
-    data.with_mut_ok(|cfg| {
-        let interval_sets = cfg
-            .bedtimes
+    data.with_ok(|cfg| {
+        cfg.bedtimes
             .values()
             .chunk_by(|bedtime| bedtime.user)
             .into_iter()
@@ -96,14 +96,30 @@ async fn get_bedtime_intervals_and_prune(
                     .collect::<IntervalSet<_>>();
                 (user_id, intervals)
             })
-            .collect::<BTreeMap<_, _>>();
-
-        // prune outdated bedtimes that don't repeat
-        cfg.bedtimes.retain(|_, b| b.first >= (now - cfg.duration) || !b.repeat.is_empty());
-
-        interval_sets
+            .collect::<BTreeMap<_, _>>()
     })
     .await
+}
+
+async fn prune_outdated_bedtimes(data: &impl With<ConfigT>, now: DateTime<Utc>) -> Result<()> {
+    let outdated = data
+        .with_ok(|cfg| {
+            cfg.bedtimes
+                .iter()
+                .filter(|(_, b)| b.repeat.is_empty() && b.first < now - cfg.duration)
+                .map(|(id, _)| *id)
+                .collect::<HashSet<_>>()
+        })
+        .await?;
+
+    if !outdated.is_empty() {
+        data.with_mut_ok(|cfg| {
+            cfg.bedtimes.retain(|id, _| !outdated.contains(id));
+        })
+        .await?;
+    }
+
+    Ok(())
 }
 
 async fn enforce_bedtime(ctx: &Context, cfg: &ConfigT, member: Member) -> Result<()> {

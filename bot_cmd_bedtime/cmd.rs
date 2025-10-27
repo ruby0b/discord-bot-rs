@@ -45,7 +45,7 @@ pub async fn bedtimes<D: With<ConfigT>>(ctx: CmdContext<'_, D>) -> Result<()> {
     let now = Utc::now();
     let (next_id, next_bedtime) = ctx
         .data()
-        .with_mut_ok(|cfg| {
+        .with_ok(|cfg| {
             cfg.bedtimes
                 .iter()
                 .filter(|(_, bedtime)| bedtime.user == ctx.author().id)

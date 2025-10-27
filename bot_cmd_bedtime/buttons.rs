@@ -84,7 +84,7 @@ pub async fn select_bedtime(
 
     let bedtime = ctx
         .user_data
-        .with_mut(|cfg| {
+        .with(|cfg| {
             let bedtime = cfg.bedtimes.get(&id).cloned().ok_or_eyre("Bedtime no longer exists")?;
             ensure!(component.user.id == bedtime.user, "That's not your own bedtime");
             Ok(bedtime)
