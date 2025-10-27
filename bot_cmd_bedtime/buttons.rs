@@ -63,7 +63,7 @@ pub async fn delete_button(
     let now = Utc::now();
     CreateReply::new()
         .embed(bedtime.embed(now).color(Color::DARKER_GREY))
-        .components(vec![bedtime.select_menu_component(id, ctx.user_data, now).await?])
+        .components(bedtime.select_menu_component(id, ctx.user_data, now).await?)
         .edit_message(ctx.serenity_context, &component.message)
         .await?;
 

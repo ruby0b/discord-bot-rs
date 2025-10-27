@@ -66,58 +66,67 @@ impl Bedtime {
         data: &impl With<ConfigT>,
         now: DateTime<Utc>,
     ) -> Result<Vec<CreateActionRow>> {
-        Ok(vec![
-            self.select_menu_component(id, data, now).await?,
-            CreateActionRow::Buttons(vec![
-                self.weekday_button(id, Weekday::Mon),
-                self.weekday_button(id, Weekday::Tue),
-                self.weekday_button(id, Weekday::Wed),
-                self.weekday_button(id, Weekday::Thu),
-                self.weekday_button(id, Weekday::Fri),
-            ]),
-            CreateActionRow::Buttons(vec![
-                self.weekday_button(id, Weekday::Sat),
-                self.weekday_button(id, Weekday::Sun),
-                CreateButton::new(format!("{DELETE_BUTTON_ID}:{id}"))
-                    .style(ButtonStyle::Danger)
-                    .emoji(ReactionType::Unicode("🗑️".to_string())),
-            ]),
-        ])
+        let mut components = self.select_menu_component(id, data, now).await?;
+
+        components.push(CreateActionRow::Buttons(vec![
+            self.weekday_button(id, Weekday::Mon),
+            self.weekday_button(id, Weekday::Tue),
+            self.weekday_button(id, Weekday::Wed),
+            self.weekday_button(id, Weekday::Thu),
+            self.weekday_button(id, Weekday::Fri),
+        ]));
+
+        components.push(CreateActionRow::Buttons(vec![
+            self.weekday_button(id, Weekday::Sat),
+            self.weekday_button(id, Weekday::Sun),
+            CreateButton::new(format!("{DELETE_BUTTON_ID}:{id}"))
+                .style(ButtonStyle::Danger)
+                .emoji(ReactionType::Unicode("🗑️".to_string())),
+        ]));
+
+        Ok(components)
     }
 
-    /// A selection menu to view other bedtimes
     pub(crate) async fn select_menu_component(
         &self,
         id: Uuid,
         data: &impl With<ConfigT>,
         now: DateTime<Utc>,
-    ) -> Result<CreateActionRow> {
-        let mut bedtimes = all_bedtimes(data, self.user).await?;
-        if bedtimes.get(&id).is_none() {
-            bedtimes.insert(id, self.clone());
-        }
-        let options = bedtimes
+    ) -> Result<Vec<CreateActionRow>> {
+        let mut components = vec![];
+
+        // add a selection menu to view other bedtimes
+        let other_bedtimes: BTreeSet<_> = all_bedtimes(data, self.user)
+            .await?
             .into_iter()
-            .map(|(bedtime_id, bedtime)| {
-                CreateSelectMenuOption::new(
-                    format_datetime(bedtime.next(now), now, &Local),
-                    bedtime_id,
-                )
-                .description(if !bedtime.repeat.is_empty() {
-                    let repeats = bedtime.repeat.iter().map(|wd| wd.0.to_string()).join(", ");
-                    format!("Repeats on: {repeats}")
-                } else {
-                    "Never repeats".to_string()
+            .filter(|(other_id, _)| *other_id != id)
+            .collect();
+        if !other_bedtimes.is_empty() {
+            let options = other_bedtimes
+                .into_iter()
+                .map(|(other_id, bedtime)| {
+                    CreateSelectMenuOption::new(
+                        format_datetime(bedtime.next(now), now, &Local),
+                        other_id,
+                    )
+                    .description(if !bedtime.repeat.is_empty() {
+                        let repeats = bedtime.repeat.iter().map(|wd| wd.0.to_string()).join(", ");
+                        format!("Repeats on: {repeats}")
+                    } else {
+                        "Never repeats".to_string()
+                    })
                 })
-                .default_selection(bedtime_id == id)
-            })
-            .collect_vec();
-        Ok(CreateActionRow::SelectMenu(
-            CreateSelectMenu::new(SELECT_BEDTIME_ID, CreateSelectMenuKind::String { options })
-                .min_values(1)
-                .max_values(1)
-                .placeholder("View other bedtimes..."),
-        ))
+                .collect_vec();
+
+            components.push(CreateActionRow::SelectMenu(
+                CreateSelectMenu::new(SELECT_BEDTIME_ID, CreateSelectMenuKind::String { options })
+                    .min_values(1)
+                    .max_values(1)
+                    .placeholder("View other bedtimes..."),
+            ));
+        }
+
+        Ok(components)
     }
 
     fn weekday_button(&self, id: Uuid, weekday: Weekday) -> CreateButton {
