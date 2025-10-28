@@ -71,7 +71,6 @@ async fn fetch_game_thumbnail(data: &impl With<ConfigT>, msg_id: MessageId) -> R
         let mut queries = vec![];
         if let Some(url) = ask.url {
             queries.push(format!("{} site:{}", ask.title, url));
-            queries.push(format!("{} {}", ask.title, url));
         }
         queries.push(format!("{} Game", ask.title));
 
