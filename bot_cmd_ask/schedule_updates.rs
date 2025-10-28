@@ -67,16 +67,27 @@ async fn fetch_game_thumbnail(data: &impl With<ConfigT>, msg_id: MessageId) -> R
         if ask.thumbnail_url.is_some() {
             return Ok(());
         }
-        let query = match ask.url {
-            Some(url) => format!("{} site:{}", ask.title, url),
-            None => format!("{} Game", ask.title),
+
+        let mut queries = vec![];
+        if let Some(url) = ask.url {
+            queries.push(format!("{} site:{}", ask.title, url));
+            queries.push(format!("{} {}", ask.title, url));
+        }
+        queries.push(format!("{} Game", ask.title));
+
+        let thumbnail_url = {
+            let mut found_url: Option<String> = None;
+            for query in &queries {
+                if let Some(url) = search_image(query).await? {
+                    found_url = Some(url);
+                    break;
+                }
+            }
+            found_url.ok_or_eyre(format!("No images found for queries: {queries:?}"))?
         };
-        let search_result = image_search::urls(image_search::Arguments::new(&query, 1)).await?;
-        let thumbnail_url = search_result
-            .first()
-            .ok_or_eyre(format!("No images found for query {query:?}"))?
-            .clone();
+
         validate_image_url(&thumbnail_url).await.wrap_err("Invalid thumbnail URL")?;
+
         thumbnail_url
     };
 
@@ -85,6 +96,12 @@ async fn fetch_game_thumbnail(data: &impl With<ConfigT>, msg_id: MessageId) -> R
         ask.thumbnail_url = Some(thumbnail_url.clone());
     })
     .await
+}
+
+async fn search_image(query: &str) -> Result<Option<String>> {
+    let search_result = image_search::urls(image_search::Arguments::new(query, 1)).await?;
+    let thumbnail_url = search_result.first().cloned();
+    Ok(thumbnail_url)
 }
 
 async fn validate_image_url(thumbnail_url: &str) -> Result<()> {
