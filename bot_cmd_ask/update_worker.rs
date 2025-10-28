@@ -3,7 +3,6 @@ use crate::ask::Ask;
 use bot_core::With;
 use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::{Builder as _, Context, MessageId, colours};
-use std::collections::HashMap;
 use std::fmt::Debug;
 use tokio::sync::mpsc;
 
