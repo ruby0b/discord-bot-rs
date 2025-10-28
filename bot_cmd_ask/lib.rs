@@ -6,7 +6,7 @@ mod buttons;
 mod cmd_ask;
 mod cmd_delete_ask_defaults;
 mod cmd_new_ask_defaults;
-mod schedule_ask_updates;
+mod schedule_updates;
 mod update_worker;
 
 use crate::ask::Ask;
@@ -14,7 +14,7 @@ pub use crate::buttons::*;
 pub use crate::cmd_ask::*;
 pub use crate::cmd_delete_ask_defaults::*;
 pub use crate::cmd_new_ask_defaults::*;
-use crate::schedule_ask_updates::schedule_ask_updates;
+use crate::schedule_updates::schedule_ask_updates;
 use crate::update_worker::{UpdateCommand, ask_update_worker};
 use bot_core::serde::LiteralRegex;
 use bot_core::{State, With};

@@ -1,5 +1,5 @@
 use crate::ask::Ask;
-use crate::schedule_ask_updates::schedule_ask_updates;
+use crate::schedule_updates::schedule_ask_updates;
 use crate::{ConfigT, StateT};
 use bot_core::{CmdContext, State, With, naive_time_to_next_datetime};
 use chrono::{NaiveTime, Utc};

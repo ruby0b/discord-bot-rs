@@ -1,9 +1,10 @@
 use crate::update_worker::UpdateCommand;
 use crate::{Ask, ConfigT, StateT};
-use bot_core::{OptionExt, State, With};
+use bot_core::{OptionExt as _, State, With};
 use chrono::{TimeDelta, Utc};
-use eyre::Result;
+use eyre::{Context, OptionExt as _, Result, ensure};
 use poise::serenity_prelude::MessageId;
+use reqwest::header::CONTENT_TYPE;
 
 pub(crate) async fn schedule_ask_updates(
     data: &(impl With<ConfigT> + State<StateT>),
@@ -70,17 +71,33 @@ async fn fetch_game_thumbnail(data: &impl With<ConfigT>, msg_id: MessageId) -> R
             Some(url) => format!("{} site:{}", ask.title, url),
             None => format!("{} Game", ask.title),
         };
-        image_search::urls(image_search::Arguments::new(&query, 1))
-            .await
-            .ok()
-            .and_then(|x| x.first().cloned())
+        let search_result = image_search::urls(image_search::Arguments::new(&query, 1)).await?;
+        let thumbnail_url = search_result
+            .first()
+            .ok_or_eyre(format!("No images found for query {query:?}"))?
+            .clone();
+        validate_image_url(&thumbnail_url).await.wrap_err("Invalid thumbnail URL")?;
+        thumbnail_url
     };
 
     data.with_mut_ok(|cfg| {
         let Some(ask) = cfg.asks.get_mut(&msg_id) else { return };
-        ask.thumbnail_url = thumbnail_url.clone();
+        ask.thumbnail_url = Some(thumbnail_url.clone());
     })
     .await
+}
+
+async fn validate_image_url(thumbnail_url: &str) -> Result<()> {
+    let response = reqwest::get(thumbnail_url).await?;
+    let content_type =
+        response.headers().get(CONTENT_TYPE).ok_or_eyre("No content type")?.to_str()?;
+    ensure!(
+        matches!(content_type, "image/jpeg" | "image/png" | "image/webp" | "image/gif"),
+        "Not an image content type: {content_type}"
+    );
+    let size = response.content_length();
+    ensure!(size.is_some_and(|l| l > 50), "Suspiciously small image of size {size:?}");
+    Ok(())
 }
 
 /// Fetch a description for the game
@@ -92,21 +109,27 @@ async fn fetch_game_description(data: &impl With<ConfigT>, msg_id: MessageId) ->
         if ask.description.is_some() {
             return Ok(());
         }
-        match &ask.url {
+        let mut description = match &ask.url {
             Some(url) => {
                 tracing::debug!("fetching game description from {}", url);
                 let html = reqwest::get(url.as_str()).await?.text().await?;
                 let document = scraper::Html::parse_document(&html);
                 let selector = scraper::Selector::parse(".game_description_snippet").unwrap();
-                document.select(&selector).next().map(|x| x.text().collect::<String>())
+                let element = document
+                    .select(&selector)
+                    .next()
+                    .ok_or_eyre(format!("No game description on {url}"))?;
+                element.text().collect::<String>()
             }
             None => return Ok(()),
-        }
+        };
+        description.truncate(1024);
+        description
     };
 
     data.with_mut_ok(|cfg| {
         let Some(ask) = cfg.asks.get_mut(&msg_id) else { return };
-        ask.description = description;
+        ask.description = Some(description);
     })
     .await
 }
