@@ -11,6 +11,7 @@ pub struct GuildData(
     Arc<GuildId>,
     Arc<crate::config::GuildConfig<GuildConfigT>>,
     Arc<bot_core::audio::StateT>,
+    Arc<bot_cmd_ask::StateT>,
     Arc<bot_cmd_tts::StateT>,
     Arc<bot_cmd_ephemeral_voice_channels::StateT>,
     Arc<bot_cmd_periodic_region_change::StateT>,
@@ -21,6 +22,7 @@ impl GuildData {
     pub fn new(guild_id: GuildId) -> Self {
         GuildData(
             Arc::new(guild_id),
+            Default::default(),
             Default::default(),
             Default::default(),
             Default::default(),

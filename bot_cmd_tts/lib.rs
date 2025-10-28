@@ -9,7 +9,9 @@ use bot_core::{EvtContext, OptionExt as _, State, VoiceChange, With, hash_store,
 use dashmap::DashMap;
 use eyre::{OptionExt as _, Result, bail};
 use itertools::Itertools;
-use poise::serenity_prelude::{CacheHttp, ChannelId, GuildId, Presence, UserId, VoiceState};
+use poise::serenity_prelude::{
+    CacheHttp, ChannelId, Context, GuildId, Presence, UserId, VoiceState,
+};
 use rand::seq::IteratorRandom as _;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -215,7 +217,7 @@ fn extend_audio(audio_1: &mut Option<Playable>, audio_2: Playable) {
     }
 }
 
-pub async fn get_clips(
+async fn get_clips(
     chttp: impl CacheHttp,
     data: &impl With<ConfigT>,
 ) -> Result<HashMap<String, Playable>> {
@@ -240,4 +242,10 @@ pub async fn get_clips(
     }
 
     Ok(clips)
+}
+
+pub async fn setup(ctx: Context, data: impl With<ConfigT>) -> Result<()> {
+    tracing::debug!("Pre-fetching TTS clips");
+    get_clips(&ctx, &data).await?;
+    Ok(())
 }

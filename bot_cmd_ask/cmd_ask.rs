@@ -1,7 +1,7 @@
-use crate::ConfigT;
 use crate::ask::Ask;
 use crate::schedule_ask_updates::schedule_ask_updates;
-use bot_core::{CmdContext, With, naive_time_to_next_datetime};
+use crate::{ConfigT, StateT};
+use bot_core::{CmdContext, State, With, naive_time_to_next_datetime};
 use chrono::{NaiveTime, Utc};
 use eyre::Result;
 use poise::serenity_prelude::CreateAllowedMentions;
@@ -9,7 +9,7 @@ use url::Url;
 
 /// Find players to play a game with you
 #[poise::command(slash_command)]
-pub async fn ask<D: With<ConfigT>>(
+pub async fn ask<D: With<ConfigT> + State<StateT>>(
     ctx: CmdContext<'_, D>,
     #[description = "Game title"] title: String,
     #[description = "Minimum number of players"] min_players: Option<u32>,
@@ -71,7 +71,7 @@ pub async fn ask<D: With<ConfigT>>(
 
     ctx.data().with_mut_ok(|cfg| cfg.asks.insert(msg_id, ask.clone())).await?;
 
-    schedule_ask_updates(ctx.serenity_context(), ctx.data(), &ask, msg_id, expiration).await;
+    schedule_ask_updates(ctx.data(), &ask, msg_id, expiration).await;
 
     Ok(())
 }

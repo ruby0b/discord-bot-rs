@@ -1,65 +1,65 @@
-use crate::{Ask, ConfigT};
-use bot_core::With;
-use bot_core::result_ext::ResultExt;
+use crate::update_worker::UpdateCommand;
+use crate::{Ask, ConfigT, StateT};
+use bot_core::{OptionExt, State, With};
 use chrono::{TimeDelta, Utc};
-use eyre::{Context as _, OptionExt as _, Result};
-use poise::serenity_prelude::{self as serenity, Builder, Context, MessageId};
+use eyre::Result;
+use poise::serenity_prelude::MessageId;
 
 pub(crate) async fn schedule_ask_updates(
-    ctx: &Context,
-    data: &impl With<ConfigT>,
+    data: &(impl With<ConfigT> + State<StateT>),
     ask: &Ask,
     msg_id: MessageId,
     expiration: TimeDelta,
 ) {
     let start = ask.start_time.signed_duration_since(Utc::now()).to_std().unwrap_or_default();
-    spawn(ctx.clone(), data.clone(), async move |ctx, data| {
+    spawn(data.clone(), async move |data| {
         tokio::time::sleep(start).await;
-        update_ask_message(&ctx, &data, msg_id).await
+        send(&data, UpdateCommand::Update(msg_id)).await
     });
 
     let disable = (expiration + (ask.start_time - Utc::now())).to_std().unwrap_or_default();
-    spawn(ctx.clone(), data.clone(), async move |ctx, data| {
+    spawn(data.clone(), async move |data| {
         tokio::time::sleep(disable).await;
-        disable_ask_message(&ctx, &data, msg_id).await
+        send(&data, UpdateCommand::Remove(msg_id)).await
     });
 
     if ask.thumbnail_url.is_none() {
-        spawn(ctx.clone(), data.clone(), async move |ctx, data| {
-            fetch_game_thumbnail(&ctx, &data, msg_id).await
+        spawn(data.clone(), async move |data| {
+            fetch_game_thumbnail(&data, msg_id).await?;
+            send(&data, UpdateCommand::Update(msg_id)).await
         });
     }
 
     if ask.description.is_none() {
-        spawn(ctx.clone(), data.clone(), async move |ctx, data| {
-            fetch_game_description(&ctx, &data, msg_id).await
+        spawn(data.clone(), async move |data| {
+            fetch_game_description(&data, msg_id).await?;
+            send(&data, UpdateCommand::Update(msg_id)).await
         });
     }
 }
 
 fn spawn<F, R, D: Sync + Send + 'static>(
-    ctx: Context,
     data: D,
-    future: impl FnOnce(Context, D) -> F + Send + 'static,
+    future: impl FnOnce(D) -> F + Send + 'static,
 ) -> tokio::task::JoinHandle<()>
 where
     F: Future<Output = Result<R>> + Send + 'static,
     R: Send + 'static,
 {
     tokio::spawn(async move {
-        if let Err(e) = future(ctx, data).await {
+        if let Err(e) = future(data).await {
             tracing::error!("Error in task: {e:?}");
         };
     })
 }
 
-/// Search for a thumbnail for the ask message and update it
-async fn fetch_game_thumbnail(
-    ctx: &Context,
-    data: &impl With<ConfigT>,
-    msg_id: MessageId,
-) -> Result<()> {
-    let (channel_id, thumbnail_url) = {
+async fn send(data: &impl State<StateT>, cmd: UpdateCommand) -> Result<()> {
+    Ok(data.state().update_sender.get().some()?.send(cmd).await?)
+}
+
+/// Search for a thumbnail for the ask message
+async fn fetch_game_thumbnail(data: &impl With<ConfigT>, msg_id: MessageId) -> Result<()> {
+    let thumbnail_url = {
         let Some(ask) = data.with_ok(|cfg| cfg.asks.get(&msg_id).cloned()).await? else {
             return Ok(());
         };
@@ -70,62 +70,29 @@ async fn fetch_game_thumbnail(
             Some(url) => format!("{} site:{}", ask.title, url),
             None => format!("{} Game", ask.title),
         };
-        let url = image_search::urls(image_search::Arguments::new(&query, 1))
+        image_search::urls(image_search::Arguments::new(&query, 1))
             .await
             .ok()
-            .and_then(|x| x.first().cloned());
-        (ask.channel_id, url)
+            .and_then(|x| x.first().cloned())
     };
 
-    let Some(edit) = data
-        .with_mut_ok(|cfg| {
-            let ask = cfg.asks.get_mut(&msg_id)?;
-            ask.thumbnail_url = thumbnail_url.clone();
-            Some(ask.edit_message())
-        })
-        .await?
-    else {
-        return Ok(());
-    };
-
-    edit.execute(ctx, (channel_id, msg_id, None))
-        .await
-        .or_else_async(|e| async {
-            // remove thumbnail on error
-            let err = Err(e).wrap_err(format!(
-                "Error while updating ask with thumbnail {thumbnail_url:?}, removing thumbnail"
-            ));
-            match data
-                .with_mut_ok(|cfg| {
-                    let ask = cfg.asks.get_mut(&msg_id)?;
-                    ask.thumbnail_url = None;
-                    Some(())
-                })
-                .await
-            {
-                Ok(_) => err,
-                Err(cfg_err) => err.wrap_err(cfg_err),
-            }
-        })
-        .await?;
-
-    Ok(())
+    data.with_mut_ok(|cfg| {
+        let Some(ask) = cfg.asks.get_mut(&msg_id) else { return };
+        ask.thumbnail_url = thumbnail_url.clone();
+    })
+    .await
 }
 
-/// Fetch a description for the game and update the ask message
-async fn fetch_game_description(
-    ctx: &Context,
-    data: &impl With<ConfigT>,
-    msg_id: MessageId,
-) -> Result<()> {
-    let (channel_id, description) = {
+/// Fetch a description for the game
+async fn fetch_game_description(data: &impl With<ConfigT>, msg_id: MessageId) -> Result<()> {
+    let description = {
         let Some(ask) = data.with_ok(|cfg| cfg.asks.get(&msg_id).cloned()).await? else {
             return Ok(());
         };
         if ask.description.is_some() {
             return Ok(());
         }
-        let description = match &ask.url {
+        match &ask.url {
             Some(url) => {
                 tracing::debug!("fetching game description from {}", url);
                 let html = reqwest::get(url.as_str()).await?.text().await?;
@@ -134,67 +101,12 @@ async fn fetch_game_description(
                 document.select(&selector).next().map(|x| x.text().collect::<String>())
             }
             None => return Ok(()),
-        };
-        (ask.channel_id, description)
+        }
     };
 
-    let Some(edit) = data
-        .with_mut_ok(|cfg| {
-            let ask = cfg.asks.get_mut(&msg_id)?;
-            ask.description = description;
-            Some(ask.edit_message())
-        })
-        .await?
-    else {
-        return Ok(());
-    };
-
-    edit.execute(ctx, (channel_id, msg_id, None)).await?;
-
-    Ok(())
-}
-
-async fn update_ask_message(
-    ctx: &Context,
-    data: &impl With<ConfigT>,
-    msg_id: MessageId,
-) -> Result<()> {
-    tracing::info!("Updating ask {msg_id}");
-
-    let (channel_id, edit, ping) = data
-        .with_mut(|cfg| {
-            let ask = cfg.asks.get_mut(&msg_id).ok_or_eyre("Can't update missing ask")?;
-            Ok((ask.channel_id, ask.edit_message(), ask.ping(msg_id)))
-        })
-        .await?;
-
-    edit.execute(ctx, (channel_id, msg_id, None)).await?;
-
-    if let Some(ping) = ping {
-        ping.execute(ctx, (channel_id, None)).await?;
-    };
-
-    Ok(())
-}
-
-async fn disable_ask_message(
-    ctx: &Context,
-    data: &impl With<ConfigT>,
-    msg_id: MessageId,
-) -> Result<()> {
-    tracing::info!("Disabling ask {msg_id}");
-
-    let (channel_id, edit, embed) = data
-        .with_mut(|cfg| {
-            let ask = cfg.asks.remove(&msg_id).ok_or_eyre("Can't remove missing ask")?;
-            Ok((ask.channel_id, ask.edit_message(), ask.embed()))
-        })
-        .await?;
-
-    edit.embed(embed.colour(serenity::colours::branding::BLACK))
-        .components(vec![])
-        .execute(ctx, (channel_id, msg_id, None))
-        .await?;
-
-    Ok(())
+    data.with_mut_ok(|cfg| {
+        let Some(ask) = cfg.asks.get_mut(&msg_id) else { return };
+        ask.description = description;
+    })
+    .await
 }

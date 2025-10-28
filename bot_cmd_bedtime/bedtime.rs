@@ -1,4 +1,4 @@
-use crate::{ConfigT, DELETE_BUTTON_ID, SELECT_BEDTIME_ID, TOGGLE_WEEKDAY_BUTTON_ID, all_bedtimes};
+use crate::{ConfigT, DELETE_BUTTON_ID, SELECT_BEDTIME_ID, TOGGLE_WEEKDAY_BUTTON_ID};
 use bot_core::With;
 use bot_core::iso_weekday::IsoWeekday;
 use chrono::{DateTime, Datelike, Days, Local, TimeDelta, TimeZone, Utc, Weekday};
@@ -9,7 +9,7 @@ use poise::serenity_prelude::{
     ButtonStyle, Color, CreateActionRow, CreateButton, CreateEmbed, CreateSelectMenu,
     CreateSelectMenuKind, CreateSelectMenuOption, ReactionType, UserId,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
 use std::iter;
 use uuid::Uuid;
@@ -139,6 +139,20 @@ impl Bedtime {
             })
             .label(weekday_str)
     }
+}
+
+async fn all_bedtimes(
+    data: &impl With<ConfigT>,
+    user_id: UserId,
+) -> Result<BTreeMap<Uuid, Bedtime>> {
+    data.with_ok(|cfg| {
+        cfg.bedtimes
+            .iter()
+            .filter(|(_, b)| b.user == user_id)
+            .map(|(id, b)| (*id, b.clone()))
+            .collect()
+    })
+    .await
 }
 
 fn format_datetime<TZ>(dt: DateTime<Utc>, now: DateTime<Utc>, display_tz: &TZ) -> String
