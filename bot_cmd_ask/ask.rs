@@ -4,7 +4,6 @@ use poise::serenity_prelude::{
     ButtonStyle, ChannelId, Colour, CreateActionRow, CreateAllowedMentions, CreateButton,
     CreateEmbed, CreateMessage, EditMessage, Mentionable as _, MessageId, RoleId, UserId,
 };
-use tracing::warn;
 use url::Url;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -99,22 +98,16 @@ impl Ask {
     }
 
     pub(crate) fn ping(&mut self, msg_id: MessageId) -> Option<CreateMessage> {
-        if !self.pinged
+        (!self.pinged
             && self.has_started()
-            && self.players.len() >= self.min_players.unwrap_or(u32::MAX) as usize
-        {
-            self.pinged = true;
-            if Utc::now() - self.start_time < TimeDelta::hours(1) {
-                Some(CreateMessage::new().reference_message((self.channel_id, msg_id)).content(
-                    format!("**Lobby readyyyyy!!!!!!!!**\n-# {}", user_mentions(&self.players)),
+            && self.players.len() >= self.min_players.unwrap_or(u32::MAX) as usize)
+            .then(|| {
+                self.pinged = true;
+                CreateMessage::new().reference_message((self.channel_id, msg_id)).content(format!(
+                    "**Lobby readyyyyy!!!!!!!!**\n-# {}",
+                    user_mentions(&self.players)
                 ))
-            } else {
-                warn!("Lobby is more than 1 hour late, not pinging");
-                None
-            }
-        } else {
-            None
-        }
+            })
     }
 }
 
