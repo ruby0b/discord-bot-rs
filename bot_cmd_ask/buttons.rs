@@ -1,9 +1,9 @@
-use crate::ask::Ask;
-use crate::{ConfigT, LEAVE_SERVER_BUTTON_ID};
-use bot_core::{EvtContext, With};
+use crate::update_worker::UpdateCommand;
+use crate::{ConfigT, LEAVE_SERVER_BUTTON_ID, StateT};
+use bot_core::{EvtContext, OptionExt, State, With};
 use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::{
-    Builder, ButtonStyle, ComponentInteraction, CreateActionRow, CreateButton, CreateInputText,
+    ButtonStyle, ComponentInteraction, CreateActionRow, CreateButton, CreateInputText,
     CreateInteractionResponse, CreateInteractionResponseMessage, CreateQuickModal, InputTextStyle,
 };
 use std::time::Duration;
@@ -15,39 +15,23 @@ pub enum AskButton {
 }
 
 pub async fn button_pressed(
-    ctx: EvtContext<'_, impl With<ConfigT>>,
+    ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
     component: &ComponentInteraction,
     ask_button: AskButton,
 ) -> Result<()> {
     let player_id = component.user.id;
 
-    let success_response = |ask: &Ask| {
-        CreateInteractionResponse::UpdateMessage(
-            CreateInteractionResponseMessage::new()
-                .embed(ask.embed())
-                .components(vec![ask.action_row()]),
-        )
-    };
-
-    let (channel_id, response, ping) = ctx
+    let response = ctx
         .user_data
         .with_mut(|cfg| {
             let ask = cfg.asks.get_mut(&component.message.id).ok_or_eyre("unknown ask")?;
-            let response = match ask_button {
+            Ok(match ask_button {
                 AskButton::Join => {
                     ask.declined_players.retain(|&x| x != player_id);
-                    if ask.full() {
-                        CreateInteractionResponse::Message(
-                            CreateInteractionResponseMessage::new()
-                                .ephemeral(true)
-                                .content("Sorry, the lobby is already full"),
-                        )
-                    } else if ask.players.contains(&player_id) {
-                        CreateInteractionResponse::Acknowledge
-                    } else {
+                    if !ask.full() && !ask.players.contains(&player_id) {
                         ask.players.push(player_id);
-                        success_response(ask)
                     }
+                    CreateInteractionResponse::Acknowledge
                 }
                 AskButton::Leave => {
                     if !ask.players.contains(&player_id)
@@ -57,7 +41,7 @@ pub async fn button_pressed(
                     } else {
                         ask.players.retain(|&x| x != player_id);
                         ask.declined_players.retain(|&x| x != player_id);
-                        success_response(ask)
+                        CreateInteractionResponse::Acknowledge
                     }
                 }
                 AskButton::Decline => {
@@ -66,19 +50,22 @@ pub async fn button_pressed(
                         leave_server_response()
                     } else {
                         ask.declined_players.push(player_id);
-                        success_response(ask)
+                        CreateInteractionResponse::Acknowledge
                     }
                 }
-            };
-            Ok((ask.channel_id, response, ask.ping(component.message.id)))
+            })
         })
         .await?;
 
     component.create_response(ctx.serenity_context, response).await?;
 
-    if let Some(ping) = ping {
-        ping.execute(ctx.serenity_context, (channel_id, None)).await?;
-    }
+    ctx.user_data
+        .state()
+        .update_sender
+        .get()
+        .some()?
+        .send(UpdateCommand::Update(component.message.id))
+        .await?;
 
     Ok(())
 }
