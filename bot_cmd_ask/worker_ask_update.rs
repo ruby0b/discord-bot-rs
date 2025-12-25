@@ -7,21 +7,21 @@ use std::fmt::Debug;
 use tokio::sync::mpsc;
 
 #[derive(Debug)]
-pub(crate) enum UpdateCommand {
+pub(crate) enum Command {
     Update(MessageId),
     Remove(MessageId),
 }
 
-pub(crate) async fn ask_update_worker(ctx: Context, data: impl With<ConfigT>, mut rx: mpsc::Receiver<UpdateCommand>) {
+pub(crate) async fn work(ctx: Context, data: impl With<ConfigT>, mut rx: mpsc::Receiver<Command>) {
     loop {
         if let Err(error) = {
             let Some(cmd) = rx.recv().await else { break };
             match cmd {
-                UpdateCommand::Update(message_id) => {
+                Command::Update(message_id) => {
                     tracing::debug!("Updating ask {message_id}");
                     update_ask(&ctx, &data, message_id).await
                 }
-                UpdateCommand::Remove(message_id) => {
+                Command::Remove(message_id) => {
                     tracing::debug!("Removing ask {message_id}");
                     remove_ask(&ctx, &data, message_id).await
                 }

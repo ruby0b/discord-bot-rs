@@ -9,6 +9,7 @@ pub mod interval_set;
 pub mod iso_weekday;
 pub mod result_ext;
 pub mod serde;
+pub mod set_ext;
 pub mod template;
 pub mod timer_queue;
 

@@ -132,3 +132,9 @@ impl Ord for LiteralRegex {
         self.0.as_str().cmp(other.0.as_str())
     }
 }
+
+impl std::hash::Hash for LiteralRegex {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.as_str().hash(state);
+    }
+}

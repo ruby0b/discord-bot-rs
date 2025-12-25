@@ -1,10 +1,11 @@
-use crate::update_worker::UpdateCommand;
-use crate::{ConfigT, LEAVE_SERVER_BUTTON_ID, StateT};
-use bot_core::{EvtContext, OptionExt, State, With};
+use crate::{ConfigT, LEAVE_SERVER_BUTTON_ID, StateT, worker_ask_update, worker_game_roles};
+use bot_core::set_ext::{BTreeSetExt, ToggleResult};
+use bot_core::{CreateReplyExt, EvtContext, OptionExt, State, With};
 use eyre::{OptionExt as _, Result};
+use poise::CreateReply;
 use poise::serenity_prelude::{
-    ButtonStyle, ComponentInteraction, CreateActionRow, CreateButton, CreateInputText, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateQuickModal, InputTextStyle,
+    ButtonStyle, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateInputText,
+    CreateInteractionResponse, CreateInteractionResponseMessage, CreateQuickModal, InputTextStyle,
 };
 use std::time::Duration;
 
@@ -57,7 +58,13 @@ pub async fn button_pressed(
 
     component.create_response(ctx.serenity_context, response).await?;
 
-    ctx.user_data.state().update_sender.get().some()?.send(UpdateCommand::Update(component.message.id)).await?;
+    ctx.user_data
+        .state()
+        .ask_update_sender
+        .get()
+        .some()?
+        .send(worker_ask_update::Command::Update(component.message.id))
+        .await?;
 
     Ok(())
 }
@@ -78,5 +85,46 @@ pub async fn leave_server(ctx: EvtContext<'_, impl With<ConfigT>>, component: &C
         .timeout(Duration::from_secs(2 * 60))
         .execute(ctx.serenity_context, component.id, &component.token)
         .await?;
+    Ok(())
+}
+
+pub async fn toggle_game_role(
+    ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
+    component: &ComponentInteraction,
+) -> Result<()> {
+    let user_id = component.user.id;
+    let role_id = ctx
+        .user_data
+        .with(|cfg| {
+            let ask = cfg.asks.get(&component.message.id).ok_or_eyre("Unknown ask")?;
+            let role_id = ask.role_id.ok_or_eyre("No role was pinged, so you can't unsubscribe from this ask.")?;
+            Ok(role_id)
+        })
+        .await?;
+
+    let role_name = {
+        let guild = ctx.serenity_context.cache.guild(component.guild_id.some()?).some()?;
+        guild.roles.get(&role_id).ok_or_eyre(format!("Could not find role with id {role_id}"))?.name.clone()
+    };
+
+    let response = ctx
+        .user_data
+        .with_mut(|cfg| {
+            let game = cfg.games.get_mut(&role_name).ok_or_eyre("No game role is associated with this ask.")?;
+            Ok(match game.opted_out_users.toggle(user_id) {
+                ToggleResult::Inserted => format!("🔕 Unsubscribed from {role_name}"),
+                ToggleResult::Removed => format!("🔔 Subscribed to {role_name}"),
+            })
+        })
+        .await?;
+
+    CreateReply::new()
+        .embed(CreateEmbed::new().colour(Colour::GOLD).description(response))
+        .ephemeral(true)
+        .respond_to_interaction(ctx.serenity_context, component)
+        .await?;
+
+    ctx.user_data.state().game_role_sender.get().some()?.send(worker_game_roles::Command::Update).await?;
+
     Ok(())
 }

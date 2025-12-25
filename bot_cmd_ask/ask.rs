@@ -1,4 +1,4 @@
-use crate::{DECLINE_BUTTON_ID, JOIN_BUTTON_ID, LEAVE_BUTTON_ID};
+use crate::{DECLINE_BUTTON_ID, JOIN_BUTTON_ID, LEAVE_BUTTON_ID, TOGGLE_GAME_ROLE_BUTTON_ID};
 use chrono::{DateTime, TimeDelta, Utc};
 use poise::serenity_prelude::{
     ButtonStyle, ChannelId, Colour, CreateActionRow, CreateAllowedMentions, CreateButton, CreateEmbed, CreateMessage,
@@ -87,6 +87,7 @@ impl Ask {
             CreateButton::new(JOIN_BUTTON_ID).style(ButtonStyle::Success).disabled(self.full()).label("Join"),
             CreateButton::new(DECLINE_BUTTON_ID).style(ButtonStyle::Danger).label("Decline"),
             CreateButton::new(LEAVE_BUTTON_ID).style(ButtonStyle::Secondary).label("Leave"),
+            CreateButton::new(TOGGLE_GAME_ROLE_BUTTON_ID).style(ButtonStyle::Secondary).emoji('🔔'),
         ])
     }
 
@@ -96,7 +97,7 @@ impl Ask {
                 self.pinged = true;
                 CreateMessage::new()
                     .reference_message((self.channel_id, msg_id))
-                    .content(format!("**Lobby readyyyyy!!!!!!!!**\n-# {}", user_mentions(&self.players)))
+                    .content(format!("**Lobby ready!**\n-# {}", user_mentions(&self.players)))
             })
     }
 }

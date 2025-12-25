@@ -41,8 +41,8 @@ async fn main() -> Result<()> {
             config::config(),
             config::restore(),
             bot_cmd_ask::ask(),
-            bot_cmd_ask::delete_ask_defaults(),
-            bot_cmd_ask::new_ask_defaults(),
+            bot_cmd_ask::delete_ask_game(),
+            bot_cmd_ask::configure_ask_game(),
             bot_cmd_bedtime::bedtime(),
             bot_cmd_bedtime::bedtimes(),
             bot_cmd_eval::d2(),
@@ -94,6 +94,9 @@ async fn main() -> Result<()> {
                             bot_cmd_ask::DECLINE_BUTTON_ID => {
                                 bot_cmd_ask::button_pressed(framework, component, bot_cmd_ask::AskButton::Decline)
                                     .await?;
+                            }
+                            bot_cmd_ask::TOGGLE_GAME_ROLE_BUTTON_ID => {
+                                bot_cmd_ask::toggle_game_role(framework, component).await?;
                             }
                             bot_cmd_ask::LEAVE_SERVER_BUTTON_ID => {
                                 bot_cmd_ask::leave_server(framework, component).await?;

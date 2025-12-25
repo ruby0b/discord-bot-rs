@@ -1,4 +1,4 @@
-use crate::update_worker::UpdateCommand;
+use crate::worker_ask_update::Command;
 use crate::{Ask, ConfigT, StateT};
 use bot_core::{OptionExt as _, State, With};
 use chrono::{TimeDelta, Utc};
@@ -14,26 +14,26 @@ pub(crate) async fn schedule_ask_updates(
     let start = ask.start_time.signed_duration_since(Utc::now()).to_std().unwrap_or_default();
     spawn(data.clone(), async move |data| {
         tokio::time::sleep(start).await;
-        send(&data, UpdateCommand::Update(msg_id)).await
+        send(&data, Command::Update(msg_id)).await
     });
 
     let disable = (expiration + (ask.start_time - Utc::now())).to_std().unwrap_or_default();
     spawn(data.clone(), async move |data| {
         tokio::time::sleep(disable).await;
-        send(&data, UpdateCommand::Remove(msg_id)).await
+        send(&data, Command::Remove(msg_id)).await
     });
 
     if ask.thumbnail_url.is_none() {
         spawn(data.clone(), async move |data| {
             fetch_game_thumbnail(&data, msg_id).await?;
-            send(&data, UpdateCommand::Update(msg_id)).await
+            send(&data, Command::Update(msg_id)).await
         });
     }
 
     if ask.description.is_none() {
         spawn(data.clone(), async move |data| {
             fetch_game_description(&data, msg_id).await?;
-            send(&data, UpdateCommand::Update(msg_id)).await
+            send(&data, Command::Update(msg_id)).await
         });
     }
 }
@@ -53,8 +53,8 @@ where
     })
 }
 
-async fn send(data: &impl State<StateT>, cmd: UpdateCommand) -> Result<()> {
-    Ok(data.state().update_sender.get().some()?.send(cmd).await?)
+async fn send(data: &impl State<StateT>, cmd: Command) -> Result<()> {
+    Ok(data.state().ask_update_sender.get().some()?.send(cmd).await?)
 }
 
 /// Search for a thumbnail for the ask message
