@@ -13,11 +13,7 @@ pub(crate) enum UpdateCommand {
     Shutdown,
 }
 
-pub(crate) async fn ask_update_worker(
-    ctx: Context,
-    data: impl With<ConfigT>,
-    mut rx: mpsc::Receiver<UpdateCommand>,
-) {
+pub(crate) async fn ask_update_worker(ctx: Context, data: impl With<ConfigT>, mut rx: mpsc::Receiver<UpdateCommand>) {
     loop {
         if let Err(error) = {
             let Some(cmd) = rx.recv().await else { break };
@@ -59,11 +55,7 @@ async fn update_ask(ctx: &Context, data: &impl With<ConfigT>, msg_id: MessageId)
 }
 
 async fn remove_ask(ctx: &Context, data: &impl With<ConfigT>, msg_id: MessageId) -> Result<Ask> {
-    let ask = data
-        .with_mut(|cfg| {
-            Ok(cfg.asks.remove(&msg_id).ok_or_eyre("Can't remove missing ask")?.clone())
-        })
-        .await?;
+    let ask = data.with_mut(|cfg| Ok(cfg.asks.remove(&msg_id).ok_or_eyre("Can't remove missing ask")?.clone())).await?;
 
     ask.edit_message()
         .embed(ask.embed().colour(colours::branding::BLACK))

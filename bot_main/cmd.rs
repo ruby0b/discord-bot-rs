@@ -13,8 +13,7 @@ pub async fn register<D: UserData>(ctx: CmdContext<'_, D>) -> Result<()> {
 #[poise::command(prefix_command, owners_only, aliases("rr"))]
 pub async fn reregister<D: UserData>(ctx: CmdContext<'_, D>) -> Result<()> {
     let guild_id = ctx.guild_id().ok_or_eyre("Must be called in guild")?;
-    let create_commands =
-        poise::builtins::create_application_commands(&ctx.framework().options().commands);
+    let create_commands = poise::builtins::create_application_commands(&ctx.framework().options().commands);
 
     guild_id.set_commands(ctx, vec![]).await?;
     guild_id.set_commands(ctx, create_commands).await?;

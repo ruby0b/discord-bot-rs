@@ -57,9 +57,7 @@ impl Currency {
     }
 }
 
-#[derive(
-    serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default,
-)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 struct DailyIncome {
     amount: u64,
     grace_period_days: u32,

@@ -31,11 +31,7 @@ pub async fn toggle_weekday_button(
         })
         .await?;
 
-    bedtime
-        .reply(id, ctx.user_data, Utc::now())
-        .await?
-        .edit_message(ctx.serenity_context, &component.message)
-        .await?;
+    bedtime.reply(id, ctx.user_data, Utc::now()).await?.edit_message(ctx.serenity_context, &component.message).await?;
 
     Ok(())
 }
@@ -70,10 +66,7 @@ pub async fn delete_button(
     Ok(())
 }
 
-pub async fn select_bedtime(
-    ctx: EvtContext<'_, impl With<ConfigT>>,
-    component: &ComponentInteraction,
-) -> Result<()> {
+pub async fn select_bedtime(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
     let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind else {
         return Ok(());
     };
@@ -91,11 +84,7 @@ pub async fn select_bedtime(
         })
         .await?;
 
-    bedtime
-        .reply(id, ctx.user_data, Utc::now())
-        .await?
-        .edit_message(ctx.serenity_context, &component.message)
-        .await?;
+    bedtime.reply(id, ctx.user_data, Utc::now()).await?.edit_message(ctx.serenity_context, &component.message).await?;
 
     Ok(())
 }

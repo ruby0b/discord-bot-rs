@@ -6,11 +6,7 @@ use fancy_regex::Regex;
 use url::Url;
 
 /// Add /ask default values for matching game titles
-#[poise::command(
-    slash_command,
-    required_permissions = "MANAGE_GUILD",
-    default_member_permissions = "MANAGE_GUILD"
-)]
+#[poise::command(slash_command, required_permissions = "MANAGE_GUILD", default_member_permissions = "MANAGE_GUILD")]
 pub async fn new_ask_defaults<D: With<ConfigT>>(
     ctx: CmdContext<'_, D>,
     #[description = "Regex to match the game title"] title_pattern: String,

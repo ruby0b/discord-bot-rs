@@ -1,7 +1,6 @@
 use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::{
-    Builder, CacheHttp, ChannelId, CreateAttachment, EditMessage, FormattedTimestamp, GuildId,
-    Message, MessageId,
+    Builder, CacheHttp, ChannelId, CreateAttachment, EditMessage, FormattedTimestamp, GuildId, Message, MessageId,
 };
 
 /// File storage using a Discord message attachment

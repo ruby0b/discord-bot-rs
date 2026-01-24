@@ -1,7 +1,5 @@
 use eyre::{Error, Report};
-use poise::serenity_prelude::{
-    Colour, CreateEmbed, CreateInteractionResponse, FullEvent, Interaction,
-};
+use poise::serenity_prelude::{Colour, CreateEmbed, CreateInteractionResponse, FullEvent, Interaction};
 use poise::{CreateReply, FrameworkError};
 
 pub async fn on_error<D>(error: FrameworkError<'_, D, Error>) {
@@ -13,10 +11,7 @@ pub async fn on_error<D>(error: FrameworkError<'_, D, Error>) {
             FrameworkError::EventHandler { error, event, framework, .. } => {
                 let event_name = event.snake_case_name();
                 tracing::error!("Event handler error on {event_name}: {error:?}");
-                if let FullEvent::InteractionCreate {
-                    interaction: Interaction::Component(component),
-                } = event
-                {
+                if let FullEvent::InteractionCreate { interaction: Interaction::Component(component) } = event {
                     let reply = error_reply(format_report(error));
                     // XXX: There is no way for us to know if the interaction has already been responded to,
                     // so we try to create a response first, and if that fails, we send a followup instead.

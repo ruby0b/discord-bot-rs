@@ -2,15 +2,13 @@ use chrono::Timelike;
 use itertools::Itertools as _;
 use poise::serenity_prelude::all::{AutocompleteChoice, CreateAutocompleteResponse};
 
-pub async fn voice_region<U, E>(
-    ctx: poise::Context<'_, U, E>,
-    _input: &str,
-) -> CreateAutocompleteResponse {
+pub async fn voice_region<U, E>(ctx: poise::Context<'_, U, E>, _input: &str) -> CreateAutocompleteResponse {
     async {
         let regions = ctx.http().get_guild_regions(ctx.guild_id().unwrap()).await?;
-        eyre::Ok(CreateAutocompleteResponse::new().set_choices(
-            regions.into_iter().map(|r| AutocompleteChoice::new(r.name, r.id)).take(25).collect(),
-        ))
+        eyre::Ok(
+            CreateAutocompleteResponse::new()
+                .set_choices(regions.into_iter().map(|r| AutocompleteChoice::new(r.name, r.id)).take(25).collect()),
+        )
     }
     .await
     .inspect_err(|e| tracing::error!("Failed to auto-complete guild regions: {e:?}"))

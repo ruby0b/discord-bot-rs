@@ -1,8 +1,8 @@
 use crate::{DECLINE_BUTTON_ID, JOIN_BUTTON_ID, LEAVE_BUTTON_ID};
 use chrono::{DateTime, TimeDelta, Utc};
 use poise::serenity_prelude::{
-    ButtonStyle, ChannelId, Colour, CreateActionRow, CreateAllowedMentions, CreateButton,
-    CreateEmbed, CreateMessage, EditMessage, Mentionable as _, MessageId, RoleId, UserId,
+    ButtonStyle, ChannelId, Colour, CreateActionRow, CreateAllowedMentions, CreateButton, CreateEmbed, CreateMessage,
+    EditMessage, Mentionable as _, MessageId, RoleId, UserId,
 };
 use url::Url;
 
@@ -57,11 +57,7 @@ impl Ask {
             let mentions = user_mentions(&self.declined_players);
             ("Declined", format!("-# {mentions}"), false)
         }));
-        let embed = embed.field(
-            format!("Players: {}", self.players.len()),
-            user_mentions(&self.players),
-            false,
-        );
+        let embed = embed.field(format!("Players: {}", self.players.len()), user_mentions(&self.players), false);
         let embed = match &self.description {
             Some(description) => embed.description(description),
             None => embed,
@@ -88,25 +84,19 @@ impl Ask {
 
     pub(crate) fn action_row(&self) -> CreateActionRow {
         CreateActionRow::Buttons(vec![
-            CreateButton::new(JOIN_BUTTON_ID)
-                .style(ButtonStyle::Success)
-                .disabled(self.full())
-                .label("Join"),
+            CreateButton::new(JOIN_BUTTON_ID).style(ButtonStyle::Success).disabled(self.full()).label("Join"),
             CreateButton::new(DECLINE_BUTTON_ID).style(ButtonStyle::Danger).label("Decline"),
             CreateButton::new(LEAVE_BUTTON_ID).style(ButtonStyle::Secondary).label("Leave"),
         ])
     }
 
     pub(crate) fn ping(&mut self, msg_id: MessageId) -> Option<CreateMessage> {
-        (!self.pinged
-            && self.has_started()
-            && self.players.len() >= self.min_players.unwrap_or(u32::MAX) as usize)
+        (!self.pinged && self.has_started() && self.players.len() >= self.min_players.unwrap_or(u32::MAX) as usize)
             .then(|| {
                 self.pinged = true;
-                CreateMessage::new().reference_message((self.channel_id, msg_id)).content(format!(
-                    "**Lobby readyyyyy!!!!!!!!**\n-# {}",
-                    user_mentions(&self.players)
-                ))
+                CreateMessage::new()
+                    .reference_message((self.channel_id, msg_id))
+                    .content(format!("**Lobby readyyyyy!!!!!!!!**\n-# {}", user_mentions(&self.players)))
             })
     }
 }

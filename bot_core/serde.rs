@@ -53,8 +53,7 @@ pub mod emoji {
     where
         D: de::Deserializer<'de>,
     {
-        ReactionType::try_from(<String as Deserialize>::deserialize(deserializer)?)
-            .map_err(serde::de::Error::custom)
+        ReactionType::try_from(<String as Deserialize>::deserialize(deserializer)?).map_err(serde::de::Error::custom)
     }
 }
 
@@ -73,8 +72,7 @@ pub mod regex_str {
     where
         D: de::Deserializer<'de>,
     {
-        Regex::new(&<String as Deserialize>::deserialize(deserializer)?)
-            .map_err(serde::de::Error::custom)
+        Regex::new(&<String as Deserialize>::deserialize(deserializer)?).map_err(serde::de::Error::custom)
     }
 }
 
@@ -106,8 +104,8 @@ impl<'de> serde::Deserialize<'de> for MessageLink {
         D: serde::Deserializer<'de>,
     {
         let url = String::deserialize(deserializer)?;
-        let (guild_id, channel_id, message_id) = parse_message_url(&url)
-            .ok_or_else(|| serde::de::Error::custom("Invalid message URL"))?;
+        let (guild_id, channel_id, message_id) =
+            parse_message_url(&url).ok_or_else(|| serde::de::Error::custom("Invalid message URL"))?;
         Ok(MessageLink { message_id, channel_id, guild_id })
     }
 }

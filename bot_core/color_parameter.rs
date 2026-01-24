@@ -41,9 +41,9 @@ impl SlashArgument for HexColorParameter {
         value: &ResolvedValue<'_>,
     ) -> Result<HexColorParameter, SlashArgError> {
         match *value {
-            ResolvedValue::String(s) => s
-                .parse::<HexColorParameter>()
-                .map_err(SlashArgError::new_command_structure_mismatch),
+            ResolvedValue::String(s) => {
+                s.parse::<HexColorParameter>().map_err(SlashArgError::new_command_structure_mismatch)
+            }
             _ => Err(SlashArgError::new_command_structure_mismatch("expected string")),
         }
     }

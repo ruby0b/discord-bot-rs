@@ -9,9 +9,7 @@ use bot_core::{EvtContext, OptionExt as _, State, VoiceChange, With, hash_store,
 use dashmap::DashMap;
 use eyre::{OptionExt as _, Result, bail};
 use itertools::Itertools;
-use poise::serenity_prelude::{
-    CacheHttp, ChannelId, Context, GuildId, Presence, UserId, VoiceState,
-};
+use poise::serenity_prelude::{CacheHttp, ChannelId, Context, GuildId, Presence, UserId, VoiceState};
 use rand::seq::IteratorRandom as _;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -66,9 +64,7 @@ pub async fn voice_update(
 ) -> Result<()> {
     let (get, channel_id, cooldown_id) = match VoiceChange::new((old, new)) {
         VoiceChange::Join { to } => ((|c| &c.join) as fn(&ConfigT) -> &Tts, to, CooldownId::Join),
-        VoiceChange::Leave { from } => {
-            ((|c| &c.leave) as fn(&ConfigT) -> &Tts, from, CooldownId::Leave)
-        }
+        VoiceChange::Leave { from } => ((|c| &c.leave) as fn(&ConfigT) -> &Tts, from, CooldownId::Leave),
         _ => return Ok(()),
     };
 
@@ -83,10 +79,7 @@ pub async fn voice_update(
     Ok(())
 }
 
-pub async fn presence_update(
-    ctx: EvtContext<'_, impl UserDataT>,
-    presence: &Presence,
-) -> Result<()> {
+pub async fn presence_update(ctx: EvtContext<'_, impl UserDataT>, presence: &Presence) -> Result<()> {
     let guild_id = presence.guild_id.ok_or_eyre("No guild ID")?;
     let vc_id = {
         let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
@@ -217,10 +210,7 @@ fn extend_audio(audio_1: &mut Option<Playable>, audio_2: Playable) {
     }
 }
 
-async fn get_clips(
-    chttp: impl CacheHttp,
-    data: &impl With<ConfigT>,
-) -> Result<HashMap<String, Playable>> {
+async fn get_clips(chttp: impl CacheHttp, data: &impl With<ConfigT>) -> Result<HashMap<String, Playable>> {
     let files = data.with_ok(|cfg| cfg.clips.clone()).await?;
 
     let mut clips = HashMap::new();

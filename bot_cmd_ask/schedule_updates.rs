@@ -105,8 +105,7 @@ async fn search_image(query: &str) -> Result<Option<String>> {
 
 async fn validate_image_url(thumbnail_url: &str) -> Result<()> {
     let response = reqwest::get(thumbnail_url).await?;
-    let content_type =
-        response.headers().get(CONTENT_TYPE).ok_or_eyre("No content type")?.to_str()?;
+    let content_type = response.headers().get(CONTENT_TYPE).ok_or_eyre("No content type")?.to_str()?;
     ensure!(
         matches!(content_type, "image/jpeg" | "image/png" | "image/webp" | "image/gif"),
         "Not an image content type: {content_type}"
@@ -131,10 +130,7 @@ async fn fetch_game_description(data: &impl With<ConfigT>, msg_id: MessageId) ->
                 let html = reqwest::get(url.as_str()).await?.text().await?;
                 let document = scraper::Html::parse_document(&html);
                 let selector = scraper::Selector::parse(".game_description_snippet").unwrap();
-                let element = document
-                    .select(&selector)
-                    .next()
-                    .ok_or_eyre(format!("No game description on {url}"))?;
+                let element = document.select(&selector).next().ok_or_eyre(format!("No game description on {url}"))?;
                 element.text().collect::<String>()
             }
             None => return Ok(()),

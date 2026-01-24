@@ -3,8 +3,8 @@ use crate::{ConfigT, LEAVE_SERVER_BUTTON_ID, StateT};
 use bot_core::{EvtContext, OptionExt, State, With};
 use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::{
-    ButtonStyle, ComponentInteraction, CreateActionRow, CreateButton, CreateInputText,
-    CreateInteractionResponse, CreateInteractionResponseMessage, CreateQuickModal, InputTextStyle,
+    ButtonStyle, ComponentInteraction, CreateActionRow, CreateButton, CreateInputText, CreateInteractionResponse,
+    CreateInteractionResponseMessage, CreateQuickModal, InputTextStyle,
 };
 use std::time::Duration;
 
@@ -34,9 +34,7 @@ pub async fn button_pressed(
                     CreateInteractionResponse::Acknowledge
                 }
                 AskButton::Leave => {
-                    if !ask.players.contains(&player_id)
-                        && !ask.declined_players.contains(&player_id)
-                    {
+                    if !ask.players.contains(&player_id) && !ask.declined_players.contains(&player_id) {
                         leave_server_response()
                     } else {
                         ask.players.retain(|&x| x != player_id);
@@ -59,39 +57,24 @@ pub async fn button_pressed(
 
     component.create_response(ctx.serenity_context, response).await?;
 
-    ctx.user_data
-        .state()
-        .update_sender
-        .get()
-        .some()?
-        .send(UpdateCommand::Update(component.message.id))
-        .await?;
+    ctx.user_data.state().update_sender.get().some()?.send(UpdateCommand::Update(component.message.id)).await?;
 
     Ok(())
 }
 
 fn leave_server_response() -> CreateInteractionResponse {
     CreateInteractionResponse::Message(
-        CreateInteractionResponseMessage::new()
-            .ephemeral(true)
-            .content("Press again to leave the server")
-            .components(vec![CreateActionRow::Buttons(vec![
-                CreateButton::new(LEAVE_SERVER_BUTTON_ID)
-                    .label("Leave Server")
-                    .style(ButtonStyle::Danger),
-            ])]),
+        CreateInteractionResponseMessage::new().ephemeral(true).content("Press again to leave the server").components(
+            vec![CreateActionRow::Buttons(vec![
+                CreateButton::new(LEAVE_SERVER_BUTTON_ID).label("Leave Server").style(ButtonStyle::Danger),
+            ])],
+        ),
     )
 }
 
-pub async fn leave_server(
-    ctx: EvtContext<'_, impl With<ConfigT>>,
-    component: &ComponentInteraction,
-) -> Result<()> {
+pub async fn leave_server(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
     CreateQuickModal::new("You have been banned!")
-        .field(
-            CreateInputText::new(InputTextStyle::Short, "Ban Reason", "")
-                .value("You pressed the button :("),
-        )
+        .field(CreateInputText::new(InputTextStyle::Short, "Ban Reason", "").value("You pressed the button :("))
         .timeout(Duration::from_secs(2 * 60))
         .execute(ctx.serenity_context, component.id, &component.token)
         .await?;

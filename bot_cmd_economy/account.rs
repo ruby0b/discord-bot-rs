@@ -5,9 +5,8 @@ use eyre::{OptionExt, Result};
 use itertools::Itertools;
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    ButtonStyle, ChannelType, Colour, ComponentInteraction, ComponentInteractionDataKind,
-    CreateActionRow, CreateButton, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption, Member,
+    ButtonStyle, ChannelType, Colour, ComponentInteraction, ComponentInteractionDataKind, CreateActionRow,
+    CreateButton, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, Member,
 };
 use std::collections::BTreeMap;
 use uuid::Uuid;
@@ -15,8 +14,7 @@ use uuid::Uuid;
 /// Check your balance and claim your income
 #[poise::command(slash_command, guild_only)]
 pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Member>) -> Result<()> {
-    let (reply, mut components) =
-        account_reply(ctx.data(), ctx.author_member().await.some()?.as_ref(), user).await?;
+    let (reply, mut components) = account_reply(ctx.data(), ctx.author_member().await.some()?.as_ref(), user).await?;
 
     components.push(CreateActionRow::Buttons(vec![
         CreateButton::new(ACCOUNT_BUTTON_ID).style(ButtonStyle::Primary).label("/account"),
@@ -27,12 +25,8 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
     Ok(())
 }
 
-pub async fn account_button(
-    ctx: EvtContext<'_, impl With<ConfigT>>,
-    component: &ComponentInteraction,
-) -> Result<()> {
-    let (reply, components) =
-        account_reply(ctx.user_data, component.member.as_ref().some()?, None).await?;
+pub async fn account_button(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
+    let (reply, components) = account_reply(ctx.user_data, component.member.as_ref().some()?, None).await?;
 
     reply
         .components(components)
@@ -43,20 +37,15 @@ pub async fn account_button(
     Ok(())
 }
 
-pub async fn table_select(
-    ctx: EvtContext<'_, impl With<ConfigT>>,
-    component: &ComponentInteraction,
-) -> Result<()> {
+pub async fn table_select(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
     let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind else {
         return Ok(());
     };
 
     let table_id = values.first().some()?.parse::<Uuid>()?;
     let cur = Currency::read(ctx.user_data).await?;
-    let table = ctx
-        .user_data
-        .with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist"))
-        .await?;
+    let table =
+        ctx.user_data.with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist")).await?;
 
     table.reply(&cur, table_id).respond_to_interaction(ctx.serenity_context, component).await?;
 
@@ -90,9 +79,7 @@ async fn account_reply(
             let tables = cfg
                 .gambling_tables
                 .iter()
-                .filter(|(_, t)| {
-                    t.players.contains_key(&member.user.id) || t.dealer == member.user.id
-                })
+                .filter(|(_, t)| t.players.contains_key(&member.user.id) || t.dealer == member.user.id)
                 .map(|(id, t)| (*id, t.clone()))
                 .collect::<BTreeMap<_, _>>();
 
@@ -107,11 +94,8 @@ async fn account_reply(
         .field("Balance", cur.fmt(account.balance).to_string(), true);
 
     if income != 0 {
-        let income_str = format!(
-            "{rewarded_days} day{}: +{}",
-            if rewarded_days > 1 { "s" } else { "" },
-            cur.fmt(income)
-        );
+        let income_str =
+            format!("{rewarded_days} day{}: +{}", if rewarded_days > 1 { "s" } else { "" }, cur.fmt(income));
         let title = if member.user.id == author.user.id { "Income" } else { "Uncollected Income" };
         embed = embed.field(title, income_str, true)
     }
@@ -142,11 +126,7 @@ async fn account_reply(
     Ok((CreateReply::new().embed(embed), components))
 }
 
-fn rewarded_days<TZ: TimeZone>(
-    income: &DailyIncome,
-    last_claim: Option<DateTime<TZ>>,
-    now: DateTime<TZ>,
-) -> u32 {
+fn rewarded_days<TZ: TimeZone>(income: &DailyIncome, last_claim: Option<DateTime<TZ>>, now: DateTime<TZ>) -> u32 {
     let Some(last_claim) = last_claim else { return income.grace_period_days };
     let days_passed = now.num_days_from_ce() - last_claim.num_days_from_ce();
     days_passed.clamp(0, income.grace_period_days as i32) as u32

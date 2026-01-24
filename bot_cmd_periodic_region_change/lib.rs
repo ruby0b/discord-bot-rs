@@ -1,13 +1,16 @@
 use bot_core::serde::LiteralRegex;
-use bot_core::{CmdContext, EvtContext, State, VoiceChange, With};
+use bot_core::{CmdContext, EvtContext, OptionExt as _, State, VoiceChange, With};
 use chrono::TimeDelta;
-use dashmap::DashMap;
+use dashmap::{DashMap, Entry};
 use eyre::{OptionExt as _, Result};
-use poise::serenity_prelude::all::{
-    Builder, ChannelId, ChannelType, EditChannel, GuildId, UserId, VoiceState,
-};
+use itertools::Itertools;
+use poise::serenity_prelude::Guild;
+use poise::serenity_prelude::all::{Builder, ChannelId, ChannelType, EditChannel, GuildId, UserId, VoiceState};
 use poise::serenity_prelude::prelude::Context;
 use std::collections::BTreeSet;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::Instant;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
 pub struct ConfigT {
@@ -21,7 +24,12 @@ pub struct ConfigT {
 
 #[derive(Default)]
 pub struct StateT {
-    handles: DashMap<UserId, tokio::task::JoinHandle<()>>,
+    last_region_change: DashMap<UserId, RegionChange>,
+}
+
+struct RegionChange {
+    when: Instant,
+    region: Option<String>,
 }
 
 /// Set the alternative server region for the auto region change feature
@@ -31,7 +39,7 @@ pub struct StateT {
     required_permissions = "MANAGE_GUILD",
     default_member_permissions = "MANAGE_GUILD"
 )]
-pub async fn auto_region_change<D: With<ConfigT>>(
+pub async fn periodic_region_change<D: With<ConfigT>>(
     ctx: CmdContext<'_, D>,
     #[description = "Server region"]
     #[autocomplete = "bot_core::autocomplete::voice_region"]
@@ -50,89 +58,132 @@ pub async fn voice_update<D: With<ConfigT> + State<StateT>>(
     let user_id = new.user_id;
 
     match VoiceChange::new((old, new)) {
-        VoiceChange::Leave { .. } => {
-            if let Some((_, old_handle)) = ctx.user_data.state().handles.remove(&user_id) {
-                tracing::debug!("Aborting region change task for {user_id} because they left");
-                old_handle.abort();
-            }
-        }
+        // track users joining/moving to channels with a different region
         VoiceChange::Join { to } | VoiceChange::Move { to, .. } => {
-            let Some(cooldown) = ctx
-                .user_data
-                .with_ok(|cfg| cfg.users.contains(&user_id).then_some(cfg.cooldown))
-                .await?
-            else {
+            if ctx.user_data.with_ok(|cfg| !cfg.users.contains(&user_id)).await? {
                 return Ok(());
             };
 
-            if let Some((_, old_handle)) = ctx.user_data.state().handles.remove(&user_id) {
-                tracing::debug!("Aborting old region change task for {user_id} because they moved");
-                old_handle.abort();
-            }
-
-            let handle = {
-                let data = ctx.user_data.clone();
-                let ctx = ctx.serenity_context.clone();
-                tokio::spawn(async move {
-                    loop {
-                        tokio::time::sleep(cooldown.to_std().unwrap_or_default()).await;
-                        if let Err(e) = change_region(&ctx, &data, guild_id, user_id, to).await {
-                            tracing::error!("Error while changing region for {user_id}: {e:?}");
-                        }
+            let now = Instant::now();
+            let region =
+                ctx.serenity_context.cache.guild(guild_id).some()?.channels.get(&to).some()?.rtc_region.clone();
+            match ctx.user_data.state().last_region_change.entry(user_id) {
+                Entry::Occupied(mut entry) => {
+                    let last = entry.get_mut();
+                    if region != last.region {
+                        *last = RegionChange { when: now, region };
                     }
-                })
-            };
-
-            ctx.user_data.state().handles.insert(user_id, handle);
+                }
+                Entry::Vacant(entry) => {
+                    entry.insert(RegionChange { when: now, region });
+                }
+            }
         }
-        VoiceChange::Stay => (),
+        VoiceChange::Leave { .. } | VoiceChange::Stay => (),
     }
 
     Ok(())
 }
 
+async fn periodic_region_change_loop(ctx: Context, data: impl With<ConfigT> + State<GuildId> + State<StateT>) {
+    let mut interval = tokio::time::interval(std::time::Duration::from_secs(60));
+    interval.tick().await;
+    loop {
+        if let Err(error) = periodic_region_changes(&ctx, &data).await {
+            tracing::error!("Error in periodic region change loop: {error:?}");
+        }
+        interval.tick().await;
+    }
+}
+
+async fn periodic_region_changes(
+    ctx: &Context,
+    data: &(impl With<ConfigT> + State<GuildId> + State<StateT>),
+) -> Result<()> {
+    let config = data.with_ok(|c| c.clone()).await?;
+    let guild_id: GuildId = *data.state();
+    let vc_to_users = {
+        let guild = guild_id.to_guild_cached(&ctx).some()?;
+        config
+            .users
+            .iter()
+            .map(|&u| get_user_voice_channel(&guild, u).map(|x| x.map(|vc| (vc, u))))
+            .filter_map(Result::transpose)
+            .collect::<Result<Vec<(ChannelId, UserId)>>>()?
+            .into_iter()
+            .into_group_map()
+    };
+    for (channel_id, user_ids) in vc_to_users {
+        let state: Arc<StateT> = data.state();
+        let Some(elapsed) =
+            user_ids.iter().filter_map(|u| state.last_region_change.get(u)).map(|x| x.when.elapsed()).max()
+        else {
+            continue;
+        };
+        if elapsed < config.cooldown.to_std()? {
+            continue;
+        }
+        if let DidRegionChange::YesTo(region) = change_region(ctx, &config, guild_id, channel_id).await? {
+            let now = Instant::now();
+            for user_id in user_ids {
+                state.last_region_change.insert(user_id, RegionChange { when: now, region: region.clone() });
+            }
+        }
+    }
+    Ok(())
+}
+
+enum DidRegionChange {
+    YesTo(Option<String>),
+    No,
+}
+
 async fn change_region(
     ctx: &Context,
-    data: &impl With<ConfigT>,
+    config: &ConfigT,
     guild_id: GuildId,
-    user_id: UserId,
     vc_id: ChannelId,
-) -> Result<()> {
-    let Some(config) =
-        data.with_ok(|cfg| cfg.users.contains(&user_id).then(|| cfg.clone())).await?
-    else {
-        return Ok(());
-    };
-
-    let vc = {
-        let guild = guild_id.to_guild_cached(&ctx).ok_or_eyre("uncached guild")?;
-        let Some(voice_state) = guild.voice_states.get(&user_id) else { return Ok(()) };
-        let Some(vc_id) = voice_state.channel_id else { return Ok(()) };
+) -> Result<DidRegionChange> {
+    let channel = {
+        let guild = guild_id.to_guild_cached(&ctx).some()?;
         guild.channels.get(&vc_id).ok_or_eyre("uncached channel")?.clone()
     };
 
-    if vc.id != vc_id || vc.kind != ChannelType::Voice {
-        return Ok(());
+    if channel.kind != ChannelType::Voice {
+        tracing::error!("Unexpected channel type, should be Voice but was {:?}", channel.kind);
+        return Ok(DidRegionChange::No);
     }
 
-    if let Some(status) = vc.status
-        && let Some(re) = config.ignored_vc_description
+    if let Some(status) = channel.status
+        && let Some(re) = &config.ignored_vc_description
         && re.0.is_match(&status)?
     {
-        tracing::info!("Not changing voice channel region because of status: {status}");
-        return Ok(());
+        tracing::trace!("Not changing VC region because of status: {status}");
+        return Ok(DidRegionChange::No);
     }
 
     // toggle between Automatic (None) and the configured alternative region
-    let new_region = if vc.rtc_region.is_some() { None } else { Some(config.region) };
+    let new_region = if channel.rtc_region.is_some() { None } else { Some(config.region.clone()) };
 
-    tracing::debug!("Changing voice channel region to {new_region:?} for {user_id}");
+    tracing::debug!("Changing VC region to {new_region:?} in {} ({})", channel.name, channel.id);
 
     EditChannel::new()
-        .voice_region(new_region)
+        .voice_region(new_region.clone())
         .audit_log_reason("auto region change")
-        .execute(ctx, vc.id)
+        .execute(ctx, channel.id)
         .await?;
 
+    Ok(DidRegionChange::YesTo(new_region))
+}
+
+fn get_user_voice_channel(guild: &Guild, user_id: UserId) -> Result<Option<ChannelId>> {
+    let Some(voice_state) = guild.voice_states.get(&user_id) else { return Ok(None) };
+    let Some(vc_id) = voice_state.channel_id else { return Ok(None) };
+    Ok(Some(vc_id))
+}
+
+pub async fn setup(ctx: Context, data: impl With<ConfigT> + State<StateT> + State<GuildId>) -> Result<()> {
+    tracing::debug!("Spawning periodic region change loop");
+    tokio::spawn(periodic_region_change_loop(ctx, data));
     Ok(())
 }

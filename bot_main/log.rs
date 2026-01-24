@@ -17,16 +17,14 @@ pub fn init_tracing() {
     let workspace_format = default_format.clone().with_source_location(true).with_target(false);
 
     tracing_subscriber::registry()
-        .with(
-            fmt::layer().event_format(default_format).with_filter(
-                Targets::new()
-                    .with_default(LevelFilter::TRACE)
-                    .with_targets(crates.iter().map(|&c| (c, LevelFilter::OFF))),
-            ),
-        )
-        .with(fmt::layer().event_format(workspace_format).with_filter(
-            Targets::new().with_targets(crates.iter().map(|&c| (c, LevelFilter::TRACE))),
+        .with(fmt::layer().event_format(default_format).with_filter(
+            Targets::new().with_default(LevelFilter::TRACE).with_targets(crates.iter().map(|&c| (c, LevelFilter::OFF))),
         ))
+        .with(
+            fmt::layer()
+                .event_format(workspace_format)
+                .with_filter(Targets::new().with_targets(crates.iter().map(|&c| (c, LevelFilter::TRACE)))),
+        )
         .with(EnvFilter::try_from_default_env().unwrap_or(filter))
         .init();
 }

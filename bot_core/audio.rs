@@ -139,9 +139,7 @@ impl songbird::EventHandler for PlayNextAction {
     async fn act(&self, _: &EventContext<'_>) -> Option<Event> {
         let handler_lock = self.manager.get(self.guild_id)?;
         let mut handler = handler_lock.lock().await;
-        add_queue(&mut handler, self.guild_id, self.manager.clone(), self.sounds.clone())
-            .await
-            .ok()?;
+        add_queue(&mut handler, self.guild_id, self.manager.clone(), self.sounds.clone()).await.ok()?;
         None
     }
 }

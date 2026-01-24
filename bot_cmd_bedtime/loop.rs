@@ -20,10 +20,7 @@ pub(crate) async fn bedtime_loop(ctx: Context, data: impl With<ConfigT> + State<
     }
 }
 
-async fn enforce_and_lift_bedtimes(
-    ctx: &Context,
-    data: &(impl With<ConfigT> + State<GuildId>),
-) -> Result<()> {
+async fn enforce_and_lift_bedtimes(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> Result<()> {
     let guild_id: GuildId = *data.state();
 
     let now = Utc::now();

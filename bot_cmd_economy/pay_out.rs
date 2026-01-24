@@ -4,9 +4,8 @@ use eyre::{OptionExt, Result, ensure};
 use itertools::Itertools;
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    ButtonStyle, Cache, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed,
-    CreateInputText, CreateQuickModal, InputTextStyle, Mentionable as _, Message, ModalInteraction,
-    QuickModalResponse, UserId,
+    ButtonStyle, Cache, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateInputText,
+    CreateQuickModal, InputTextStyle, Mentionable as _, Message, ModalInteraction, QuickModalResponse, UserId,
 };
 use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
@@ -20,8 +19,7 @@ pub async fn pay_player_button_pressed(
     let cur = Currency::read(ctx.user_data).await?;
     let table_id = Uuid::try_parse(param)?;
 
-    let prefix =
-        "# Only keep players you want to pay out.\n# Enter the amount of money those player won.";
+    let prefix = "# Only keep players you want to pay out.\n# Enter the amount of money those player won.";
     let (table, modal) = payout_modal(&ctx, &cur, component, table_id, prefix).await?;
     let Some(modal) = modal else { return Ok(()) };
 
@@ -41,8 +39,7 @@ pub async fn pay_player_button_pressed(
             .collect_vec()
     };
 
-    payout_confirm(ctx, &cur, table_id, &table, &component.message, &modal.interaction, &payouts)
-        .await?;
+    payout_confirm(ctx, &cur, table_id, &table, &component.message, &modal.interaction, &payouts).await?;
 
     Ok(())
 }
@@ -89,8 +86,7 @@ pub async fn pay_table_button_pressed(
         map
     };
 
-    payout_confirm(ctx, &cur, table_id, &table, &component.message, &modal.interaction, &payouts)
-        .await?;
+    payout_confirm(ctx, &cur, table_id, &table, &component.message, &modal.interaction, &payouts).await?;
 
     Ok(())
 }
@@ -102,10 +98,8 @@ async fn payout_modal(
     table_id: Uuid,
     prefix: &str,
 ) -> Result<(GamblingTable, Option<QuickModalResponse>)> {
-    let table = ctx
-        .user_data
-        .with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist"))
-        .await?;
+    let table =
+        ctx.user_data.with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist")).await?;
 
     ensure!(table.dealer == component.user.id, "You are not the dealer of this table.");
     ensure!(!table.players.is_empty(), "No players to pay out.");
@@ -169,10 +163,8 @@ async fn payout_confirm(
         .await?;
 
     let first_interaction = async {
-        while let Some(interaction) = message
-            .await_component_interaction(ctx.serenity_context)
-            .timeout(Duration::from_secs(60))
-            .await
+        while let Some(interaction) =
+            message.await_component_interaction(ctx.serenity_context).timeout(Duration::from_secs(60)).await
         {
             if table.dealer == interaction.user.id {
                 return Some(interaction);
@@ -208,11 +200,7 @@ async fn payout_confirm(
     Ok(())
 }
 
-fn parse_payout(
-    cache: &Cache,
-    players: impl IntoIterator<Item = UserId>,
-    input: &str,
-) -> Result<HashMap<UserId, u64>> {
+fn parse_payout(cache: &Cache, players: impl IntoIterator<Item = UserId>, input: &str) -> Result<HashMap<UserId, u64>> {
     let mut name_to_id = HashMap::new();
     for user_id in players {
         let name = cache.user(user_id).some()?.name.clone();
@@ -240,11 +228,7 @@ fn parse_payout(
     Ok(map)
 }
 
-fn apply_payout(
-    cfg: &mut ConfigT,
-    table_id: Uuid,
-    payouts: &[(UserId, u64)],
-) -> Result<GamblingTable> {
+fn apply_payout(cfg: &mut ConfigT, table_id: Uuid, payouts: &[(UserId, u64)]) -> Result<GamblingTable> {
     let table = cfg.gambling_tables.get_mut(&table_id).ok_or_eyre("Table doesn't exist")?;
 
     let payout_sum = payouts.iter().map(|x| x.1).sum::<u64>();
@@ -257,17 +241,8 @@ fn apply_payout(
         let account = cfg.account.entry(player_id).or_default();
         account.balance += payout;
         table.players.remove(&player_id);
-        tracing::info!(
-            "User {} received {} from {}",
-            player_id.mention(),
-            cfg.currency.fmt(payout),
-            table.name
-        );
+        tracing::info!("User {} received {} from {}", player_id.mention(), cfg.currency.fmt(payout), table.name);
     }
 
-    if table.pot == 0 {
-        Ok(cfg.gambling_tables.remove(&table_id).some()?)
-    } else {
-        Ok(table.clone())
-    }
+    if table.pot == 0 { Ok(cfg.gambling_tables.remove(&table_id).some()?) } else { Ok(table.clone()) }
 }

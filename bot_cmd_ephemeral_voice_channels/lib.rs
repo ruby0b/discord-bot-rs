@@ -1,9 +1,7 @@
 use bot_core::{EvtContext, LockSet, OptionExt as _, State, VoiceChange, With};
 use eyre::Result;
 use itertools::Itertools;
-use poise::serenity_prelude::all::{
-    Builder, ChannelId, ChannelType, CreateChannel, GuildChannel, GuildId, VoiceState,
-};
+use poise::serenity_prelude::all::{Builder, ChannelId, ChannelType, CreateChannel, GuildChannel, GuildId, VoiceState};
 use poise::serenity_prelude::{self as serenity, Context};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Default)]
@@ -145,11 +143,7 @@ async fn keep_one_empty_channel(
     Ok(())
 }
 
-fn cloned_guild_channel(
-    ctx: &Context,
-    guild_id: GuildId,
-    channel_id: ChannelId,
-) -> Option<GuildChannel> {
+fn cloned_guild_channel(ctx: &Context, guild_id: GuildId, channel_id: ChannelId) -> Option<GuildChannel> {
     let guild = ctx.cache.guild(guild_id)?;
     guild.channels.get(&channel_id).cloned()
 }

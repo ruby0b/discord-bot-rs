@@ -14,10 +14,7 @@ where
         F: Send,
         Fut: Send + Future<Output = Result<T, F>>;
 
-    async fn inspect_err_async<Fut>(
-        self,
-        f: impl Send + for<'a> FnOnce(&'a E) -> Fut,
-    ) -> Result<T, E>
+    async fn inspect_err_async<Fut>(self, f: impl Send + for<'a> FnOnce(&'a E) -> Fut) -> Result<T, E>
     where
         Fut: Send + Future<Output = ()>;
 }
@@ -50,10 +47,7 @@ where
         }
     }
 
-    async fn inspect_err_async<Fut>(
-        self,
-        f: impl Send + for<'a> FnOnce(&'a E) -> Fut,
-    ) -> Result<T, E>
+    async fn inspect_err_async<Fut>(self, f: impl Send + for<'a> FnOnce(&'a E) -> Fut) -> Result<T, E>
     where
         Fut: Send + Future<Output = ()>,
     {

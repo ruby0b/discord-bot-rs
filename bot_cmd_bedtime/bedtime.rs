@@ -6,8 +6,8 @@ use eyre::Result;
 use itertools::Itertools as _;
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    ButtonStyle, Color, CreateActionRow, CreateButton, CreateEmbed, CreateSelectMenu,
-    CreateSelectMenuKind, CreateSelectMenuOption, ReactionType, UserId,
+    ButtonStyle, Color, CreateActionRow, CreateButton, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind,
+    CreateSelectMenuOption, ReactionType, UserId,
 };
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
@@ -22,10 +22,7 @@ pub(crate) struct Bedtime {
 }
 
 impl Bedtime {
-    pub(crate) fn currently_relevant_bedtimes(
-        &self,
-        now: DateTime<Utc>,
-    ) -> BTreeSet<DateTime<Utc>> {
+    pub(crate) fn currently_relevant_bedtimes(&self, now: DateTime<Utc>) -> BTreeSet<DateTime<Utc>> {
         let today = now.date_naive().and_time(self.first.time()).and_utc();
         let repeats = [today - Days::new(1), today]
             .into_iter()
@@ -36,21 +33,11 @@ impl Bedtime {
     }
 
     pub(crate) fn next(&self, now: DateTime<Utc>) -> DateTime<Utc> {
-        self.currently_relevant_bedtimes(now)
-            .into_iter()
-            .find(|&bedtime| bedtime > now)
-            .unwrap_or(self.first)
+        self.currently_relevant_bedtimes(now).into_iter().find(|&bedtime| bedtime > now).unwrap_or(self.first)
     }
 
-    pub(crate) async fn reply(
-        &self,
-        id: Uuid,
-        data: &impl With<ConfigT>,
-        now: DateTime<Utc>,
-    ) -> Result<CreateReply> {
-        Ok(CreateReply::new()
-            .embed(self.embed(now))
-            .components(self.components(id, data, now).await?))
+    pub(crate) async fn reply(&self, id: Uuid, data: &impl With<ConfigT>, now: DateTime<Utc>) -> Result<CreateReply> {
+        Ok(CreateReply::new().embed(self.embed(now)).components(self.components(id, data, now).await?))
     }
 
     pub(crate) fn embed(&self, now: DateTime<Utc>) -> CreateEmbed {
@@ -96,25 +83,20 @@ impl Bedtime {
         let mut components = vec![];
 
         // add a selection menu to view other bedtimes
-        let other_bedtimes: BTreeSet<_> = all_bedtimes(data, self.user)
-            .await?
-            .into_iter()
-            .filter(|(other_id, _)| *other_id != id)
-            .collect();
+        let other_bedtimes: BTreeSet<_> =
+            all_bedtimes(data, self.user).await?.into_iter().filter(|(other_id, _)| *other_id != id).collect();
         if !other_bedtimes.is_empty() {
             let options = other_bedtimes
                 .into_iter()
                 .map(|(other_id, bedtime)| {
-                    CreateSelectMenuOption::new(
-                        format_datetime(bedtime.next(now), now, &Local),
-                        other_id,
+                    CreateSelectMenuOption::new(format_datetime(bedtime.next(now), now, &Local), other_id).description(
+                        if !bedtime.repeat.is_empty() {
+                            let repeats = bedtime.repeat.iter().map(|wd| wd.0.to_string()).join(", ");
+                            format!("Repeats on: {repeats}")
+                        } else {
+                            "Never repeats".to_string()
+                        },
                     )
-                    .description(if !bedtime.repeat.is_empty() {
-                        let repeats = bedtime.repeat.iter().map(|wd| wd.0.to_string()).join(", ");
-                        format!("Repeats on: {repeats}")
-                    } else {
-                        "Never repeats".to_string()
-                    })
                 })
                 .collect_vec();
 
@@ -141,18 +123,9 @@ impl Bedtime {
     }
 }
 
-async fn all_bedtimes(
-    data: &impl With<ConfigT>,
-    user_id: UserId,
-) -> Result<BTreeMap<Uuid, Bedtime>> {
-    data.with_ok(|cfg| {
-        cfg.bedtimes
-            .iter()
-            .filter(|(_, b)| b.user == user_id)
-            .map(|(id, b)| (*id, b.clone()))
-            .collect()
-    })
-    .await
+async fn all_bedtimes(data: &impl With<ConfigT>, user_id: UserId) -> Result<BTreeMap<Uuid, Bedtime>> {
+    data.with_ok(|cfg| cfg.bedtimes.iter().filter(|(_, b)| b.user == user_id).map(|(id, b)| (*id, b.clone())).collect())
+        .await
 }
 
 fn format_datetime<TZ>(dt: DateTime<Utc>, now: DateTime<Utc>, display_tz: &TZ) -> String
@@ -161,19 +134,17 @@ where
     TZ::Offset: Display,
 {
     dt.with_timezone(display_tz)
-        .format(
-            if dt.num_days_from_ce() == now.num_days_from_ce() || dt < now + TimeDelta::hours(12) {
-                "%H:%M"
-            } else if dt.num_days_from_ce() - now.num_days_from_ce() == 1 {
-                "Tomorrow at %H:%M"
-            } else if dt < now + TimeDelta::weeks(1) {
-                "%A at %H:%M"
-            } else if dt.year() == now.year() {
-                "%A, %d.%m. at %H:%M"
-            } else {
-                "%A, %d.%m.%Y at %H:%M"
-            },
-        )
+        .format(if dt.num_days_from_ce() == now.num_days_from_ce() || dt < now + TimeDelta::hours(12) {
+            "%H:%M"
+        } else if dt.num_days_from_ce() - now.num_days_from_ce() == 1 {
+            "Tomorrow at %H:%M"
+        } else if dt < now + TimeDelta::weeks(1) {
+            "%A at %H:%M"
+        } else if dt.year() == now.year() {
+            "%A, %d.%m. at %H:%M"
+        } else {
+            "%A, %d.%m.%Y at %H:%M"
+        })
         .to_string()
 }
 
@@ -188,10 +159,7 @@ mod test {
         let bedtime2 = Bedtime {
             user: Default::default(),
             first: today - TimeDelta::days(10),
-            repeat: [Weekday::Tue, Weekday::Wed, Weekday::Sun]
-                .into_iter()
-                .map(IsoWeekday)
-                .collect(),
+            repeat: [Weekday::Tue, Weekday::Wed, Weekday::Sun].into_iter().map(IsoWeekday).collect(),
         };
         assert_eq!(
             bedtime2.currently_relevant_bedtimes(today - TimeDelta::minutes(1)),
@@ -214,10 +182,7 @@ mod test {
         let bedtime = Bedtime {
             user: Default::default(),
             first: today,
-            repeat: [Weekday::Tue, Weekday::Wed, Weekday::Sun]
-                .into_iter()
-                .map(IsoWeekday)
-                .collect(),
+            repeat: [Weekday::Tue, Weekday::Wed, Weekday::Sun].into_iter().map(IsoWeekday).collect(),
         };
         assert_eq!(
             bedtime.currently_relevant_bedtimes(today - TimeDelta::minutes(1)),

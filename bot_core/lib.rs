@@ -17,8 +17,8 @@ use dashmap::DashMap;
 use eyre::{OptionExt as _, Result};
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    Builder as _, Cache, ChannelId, ComponentInteraction, Context, CreateInteractionResponse,
-    GuildId, Member, Message, ModalInteraction, UserId, VoiceState,
+    Builder as _, Cache, ChannelId, ComponentInteraction, Context, CreateInteractionResponse, GuildId, Member, Message,
+    ModalInteraction, UserId, VoiceState,
 };
 use std::hash::Hash;
 use std::sync::Arc;
@@ -35,24 +35,13 @@ pub trait With<Config>
 where
     Self: UserData,
 {
-    async fn with<Output>(
-        &self,
-        f: impl Send + for<'a> FnOnce(&'a Config) -> Result<Output>,
-    ) -> Result<Output>;
-    async fn with_mut<Output>(
-        &self,
-        f: impl Send + for<'a> FnOnce(&'a mut Config) -> Result<Output>,
-    ) -> Result<Output>;
-    async fn with_ok<Output>(
-        &self,
-        f: impl Send + for<'a> FnOnce(&'a Config) -> Output,
-    ) -> Result<Output> {
+    async fn with<Output>(&self, f: impl Send + for<'a> FnOnce(&'a Config) -> Result<Output>) -> Result<Output>;
+    async fn with_mut<Output>(&self, f: impl Send + for<'a> FnOnce(&'a mut Config) -> Result<Output>)
+    -> Result<Output>;
+    async fn with_ok<Output>(&self, f: impl Send + for<'a> FnOnce(&'a Config) -> Output) -> Result<Output> {
         self.with(|cfg| Ok(f(cfg))).await
     }
-    async fn with_mut_ok<Output>(
-        &self,
-        f: impl Send + for<'a> FnOnce(&'a mut Config) -> Output,
-    ) -> Result<Output> {
+    async fn with_mut_ok<Output>(&self, f: impl Send + for<'a> FnOnce(&'a mut Config) -> Output) -> Result<Output> {
         self.with_mut(|cfg| Ok(f(cfg))).await
     }
 }
@@ -107,7 +96,7 @@ impl VoiceChange {
             (None, Some(to)) => VoiceChange::Join { to },
             (Some(from), None) => VoiceChange::Leave { from },
             (Some(from), Some(to)) if from != to => VoiceChange::Move { from, to },
-            _ => VoiceChange::Stay,
+            (None, None) | (Some(_), Some(_)) => VoiceChange::Stay,
         }
     }
 }
@@ -117,9 +106,7 @@ pub fn avatar_url(member: &Member) -> String {
 }
 
 pub async fn deferred_message(ctx: &Context, interaction: &ModalInteraction) -> Result<()> {
-    CreateInteractionResponse::Defer(Default::default())
-        .execute(ctx, (interaction.id, &interaction.token))
-        .await?;
+    CreateInteractionResponse::Defer(Default::default()).execute(ctx, (interaction.id, &interaction.token)).await?;
     Ok(())
 }
 
@@ -128,56 +115,30 @@ pub fn safe_name(ctx: &impl AsRef<Cache>, user_id: UserId) -> String {
 }
 
 pub fn get_member(ctx: &impl AsRef<Cache>, guild_id: GuildId, user_id: UserId) -> Option<Member> {
-    let guild = ctx
-        .as_ref()
-        .guild(guild_id)
-        .inspect_none(|| tracing::warn!("Guild not in cache: {guild_id}"))?;
-    guild
-        .members
-        .get(&user_id)
-        .inspect_none(|| tracing::warn!("Member not found in cache: {guild_id}"))
-        .cloned()
+    let guild = ctx.as_ref().guild(guild_id).inspect_none(|| tracing::warn!("Guild not in cache: {guild_id}"))?;
+    guild.members.get(&user_id).inspect_none(|| tracing::warn!("Member not found in cache: {guild_id}")).cloned()
 }
 
 // todo generalize ComponentInteraction and ModalInteraction
 #[async_trait::async_trait]
 pub trait CreateReplyExt {
-    async fn respond_to_interaction(
-        self,
-        ctx: &Context,
-        interaction: &ComponentInteraction,
-    ) -> Result<()>;
+    async fn respond_to_interaction(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<()>;
 
-    async fn edit_interaction(
-        self,
-        ctx: &Context,
-        interaction: &ModalInteraction,
-    ) -> Result<Message>;
+    async fn edit_interaction(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message>;
 
     async fn edit_message(self, ctx: &Context, message: &Message) -> Result<Message>;
 }
 
 #[async_trait::async_trait]
 impl CreateReplyExt for CreateReply {
-    async fn respond_to_interaction(
-        self,
-        ctx: &Context,
-        interaction: &ComponentInteraction,
-    ) -> Result<()> {
+    async fn respond_to_interaction(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<()> {
         Ok(CreateInteractionResponse::Message(self.to_slash_initial_response(Default::default()))
             .execute(ctx, (interaction.id, &interaction.token))
             .await?)
     }
 
-    async fn edit_interaction(
-        self,
-        ctx: &Context,
-        interaction: &ModalInteraction,
-    ) -> Result<Message> {
-        Ok(self
-            .to_slash_initial_response_edit(Default::default())
-            .execute(ctx, &interaction.token)
-            .await?)
+    async fn edit_interaction(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message> {
+        Ok(self.to_slash_initial_response_edit(Default::default()).execute(ctx, &interaction.token).await?)
     }
 
     async fn edit_message(self, ctx: &Context, message: &Message) -> Result<Message> {

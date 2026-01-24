@@ -12,10 +12,8 @@ pub enum TimerCommand<T> {
     Shutdown,
 }
 
-pub async fn timer_queue_worker<T, F>(
-    mut rx: mpsc::Receiver<TimerCommand<T>>,
-    mut handler: impl FnMut(T) -> F,
-) where
+pub async fn timer_queue_worker<T, F>(mut rx: mpsc::Receiver<TimerCommand<T>>, mut handler: impl FnMut(T) -> F)
+where
     T: Debug + Send + 'static,
     F: Future<Output = Result<()>>,
 {
@@ -48,9 +46,7 @@ pub async fn timer_queue_worker<T, F>(
     }
 }
 
-pub fn spawn_timer_queue<T, F>(
-    handler: impl FnMut(T) -> F + Send + 'static,
-) -> mpsc::Sender<TimerCommand<T>>
+pub fn spawn_timer_queue<T, F>(handler: impl FnMut(T) -> F + Send + 'static) -> mpsc::Sender<TimerCommand<T>>
 where
     T: Debug + Send + 'static,
     F: Future<Output = Result<()>> + Send + 'static,

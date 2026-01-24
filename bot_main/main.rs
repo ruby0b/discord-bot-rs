@@ -11,9 +11,7 @@ mod util;
 
 use bot_core::OptionExt as _;
 use eyre::{Result, WrapErr as _};
-use poise::serenity_prelude::{
-    ChannelId, Client, FullEvent, GatewayIntents, GuildId, Interaction, Settings,
-};
+use poise::serenity_prelude::{ChannelId, Client, FullEvent, GatewayIntents, GuildId, Interaction, Settings};
 use songbird::SerenityInit as _;
 use std::sync::Arc;
 
@@ -48,16 +46,13 @@ async fn main() -> Result<()> {
             bot_cmd_eval::math(),
             bot_cmd_eval::typst(),
             bot_cmd_message::message(),
-            bot_cmd_periodic_region_change::auto_region_change(),
+            bot_cmd_periodic_region_change::periodic_region_change(),
             bot_cmd_roles::role_button(),
             bot_cmd_economy::account(),
             bot_cmd_economy::gamble(),
             bot_cmd_economy::leaderboard(),
         ],
-        prefix_options: poise::PrefixFrameworkOptions {
-            prefix: Some("=".into()),
-            ..Default::default()
-        },
+        prefix_options: poise::PrefixFrameworkOptions { prefix: Some("=".into()), ..Default::default() },
         on_error: |error| Box::pin(async { error_handling::on_error(error).await }),
         pre_command: |ctx| {
             Box::pin(async move {
@@ -70,66 +65,38 @@ async fn main() -> Result<()> {
                     FullEvent::VoiceStateUpdate { old, new } => {
                         let Some(guild_id) = new.guild_id else { return Ok(()) };
                         bot_cmd_tts::voice_update(framework, guild_id, (old, new)).await?;
-                        bot_cmd_ephemeral_voice_channels::voice_update(
-                            framework,
-                            guild_id,
-                            (old, new),
-                        )
-                        .await?;
-                        bot_cmd_periodic_region_change::voice_update(
-                            framework,
-                            guild_id,
-                            (old, new),
-                        )
-                        .await?;
+                        bot_cmd_ephemeral_voice_channels::voice_update(framework, guild_id, (old, new)).await?;
+                        bot_cmd_periodic_region_change::voice_update(framework, guild_id, (old, new)).await?;
                     }
                     FullEvent::ChannelUpdate { old, new } => {
-                        bot_cmd_ephemeral_voice_channels::channel_update(framework, old, new)
-                            .await?;
+                        bot_cmd_ephemeral_voice_channels::channel_update(framework, old, new).await?;
                     }
-                    FullEvent::PresenceUpdate { new_data, .. } => {
-                        bot_cmd_tts::presence_update(framework, new_data).await?;
+                    FullEvent::PresenceUpdate { new_data } => {
                         bot_cmd_tts::presence_update(framework, new_data).await?;
                     }
                     FullEvent::Message { new_message } => {
                         bot_cmd_role_icon::message(framework, new_message).await?;
                     }
-                    FullEvent::InteractionCreate {
-                        interaction: Interaction::Component(component),
-                    } => {
+                    FullEvent::InteractionCreate { interaction: Interaction::Component(component) } => {
                         let full_id = &component.data.custom_id;
                         let (id, param) = full_id.split_once(":").unwrap_or((full_id, ""));
                         match id {
                             bot_cmd_ask::JOIN_BUTTON_ID => {
-                                bot_cmd_ask::button_pressed(
-                                    framework,
-                                    component,
-                                    bot_cmd_ask::AskButton::Join,
-                                )
-                                .await?;
+                                bot_cmd_ask::button_pressed(framework, component, bot_cmd_ask::AskButton::Join).await?;
                             }
                             bot_cmd_ask::LEAVE_BUTTON_ID => {
-                                bot_cmd_ask::button_pressed(
-                                    framework,
-                                    component,
-                                    bot_cmd_ask::AskButton::Leave,
-                                )
-                                .await?;
+                                bot_cmd_ask::button_pressed(framework, component, bot_cmd_ask::AskButton::Leave)
+                                    .await?;
                             }
                             bot_cmd_ask::DECLINE_BUTTON_ID => {
-                                bot_cmd_ask::button_pressed(
-                                    framework,
-                                    component,
-                                    bot_cmd_ask::AskButton::Decline,
-                                )
-                                .await?;
+                                bot_cmd_ask::button_pressed(framework, component, bot_cmd_ask::AskButton::Decline)
+                                    .await?;
                             }
                             bot_cmd_ask::LEAVE_SERVER_BUTTON_ID => {
                                 bot_cmd_ask::leave_server(framework, component).await?;
                             }
                             bot_cmd_bedtime::TOGGLE_WEEKDAY_BUTTON_ID => {
-                                bot_cmd_bedtime::toggle_weekday_button(framework, component, param)
-                                    .await?;
+                                bot_cmd_bedtime::toggle_weekday_button(framework, component, param).await?;
                             }
                             bot_cmd_bedtime::DELETE_BUTTON_ID => {
                                 bot_cmd_bedtime::delete_button(framework, component, param).await?;
@@ -147,20 +114,13 @@ async fn main() -> Result<()> {
                                 bot_cmd_economy::table_select(framework, component).await?;
                             }
                             bot_cmd_economy::BUYIN_BUTTON_ID => {
-                                bot_cmd_economy::buyin_button_pressed(framework, component, param)
-                                    .await?;
+                                bot_cmd_economy::buyin_button_pressed(framework, component, param).await?;
                             }
                             bot_cmd_economy::PAY_TABLE_BUTTON_ID => {
-                                bot_cmd_economy::pay_table_button_pressed(
-                                    framework, component, param,
-                                )
-                                .await?;
+                                bot_cmd_economy::pay_table_button_pressed(framework, component, param).await?;
                             }
                             bot_cmd_economy::PAY_PLAYER_BUTTON_ID => {
-                                bot_cmd_economy::pay_player_button_pressed(
-                                    framework, component, param,
-                                )
-                                .await?;
+                                bot_cmd_economy::pay_player_button_pressed(framework, component, param).await?;
                             }
                             unknown_id => {
                                 // convention: local interaction ids start with ~
@@ -193,6 +153,7 @@ async fn main() -> Result<()> {
                 bot_cmd_tts::setup(ctx.clone(), data.clone()).await?;
                 bot_cmd_ask::setup(ctx.clone(), data.clone()).await?;
                 bot_cmd_bedtime::setup(ctx.clone(), data.clone()).await?;
+                bot_cmd_periodic_region_change::setup(ctx.clone(), data.clone()).await?;
 
                 Ok(data)
             })

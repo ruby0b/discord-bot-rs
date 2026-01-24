@@ -7,11 +7,7 @@ use std::collections::BTreeMap;
 
 /// Delete /ask default values where a title is matched by the regex
 
-#[poise::command(
-    slash_command,
-    required_permissions = "MANAGE_GUILD",
-    default_member_permissions = "MANAGE_GUILD"
-)]
+#[poise::command(slash_command, required_permissions = "MANAGE_GUILD", default_member_permissions = "MANAGE_GUILD")]
 pub async fn delete_ask_defaults<D: With<ConfigT>>(
     ctx: CmdContext<'_, D>,
     #[description = "Regex to match the game title"] title_pattern: String,
@@ -33,8 +29,7 @@ pub async fn delete_ask_defaults<D: With<ConfigT>>(
             deleted.iter().map(|(re, v)| format!("{:?}: {v:?}", re.0.as_str())).join("\n"),
             "deleted.txt",
         );
-        let reply =
-            poise::CreateReply::new().content("🗑️ Ask defaults deleted").attachment(attachment);
+        let reply = poise::CreateReply::new().content("🗑️ Ask defaults deleted").attachment(attachment);
         ctx.send(reply).await?;
     }
     Ok(())

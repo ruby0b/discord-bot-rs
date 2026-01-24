@@ -10,11 +10,7 @@ fn main() {
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let path = entry.path();
-            if path.join("Cargo.toml").exists() {
-                Some(entry.file_name().into_string().ok()?)
-            } else {
-                None
-            }
+            if path.join("Cargo.toml").exists() { Some(entry.file_name().into_string().ok()?) } else { None }
         })
         .collect::<Vec<_>>()
         .join(",");

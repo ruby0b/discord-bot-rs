@@ -6,8 +6,7 @@ pub fn diff(before: &str, after: &str) -> String {
     let input = InternedInput::new(before, after);
     let mut diff = Diff::compute(imara_diff::Algorithm::Histogram, &input);
     diff.postprocess_lines(&input);
-    diff.unified_diff(&BasicLineDiffPrinter(&input.interner), UnifiedDiffConfig::default(), &input)
-        .to_string()
+    diff.unified_diff(&BasicLineDiffPrinter(&input.interner), UnifiedDiffConfig::default(), &input).to_string()
 }
 
 pub fn code_block_or_file(

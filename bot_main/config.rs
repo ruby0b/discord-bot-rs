@@ -3,9 +3,9 @@ use crate::util::{code_block_or_file, diff};
 use bot_core::{CmdContext, OptionExt as _, State};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use poise::serenity_prelude::{
-    Builder, Cache, CacheHttp, ChannelId, CreateAttachment, CreateAutocompleteResponse,
-    CreateInputText, CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateQuickModal, GuildId, Http, InputTextStyle, InteractionId, Message, ModalInteraction,
+    Builder, Cache, CacheHttp, ChannelId, CreateAttachment, CreateAutocompleteResponse, CreateInputText,
+    CreateInteractionResponse, CreateInteractionResponseFollowup, CreateQuickModal, GuildId, Http, InputTextStyle,
+    InteractionId, Message, ModalInteraction,
 };
 use poise::{ChoiceParameter, CreateReply, serenity_prelude as serenity};
 use serde::{Deserialize, Serialize};
@@ -14,15 +14,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{OnceCell, RwLock};
 
-pub trait ConfigDataT = serde::Serialize
-    + for<'a> serde::Deserialize<'a>
-    + Default
-    + Debug
-    + Clone
-    + PartialEq
-    + Send
-    + Sync
-    + 'static;
+pub trait ConfigDataT =
+    serde::Serialize + for<'a> serde::Deserialize<'a> + Default + Debug + Clone + PartialEq + Send + Sync + 'static;
 
 pub struct GuildConfig<DataT: ConfigDataT>(RwLock<OnceCell<ConfigInner<DataT>>>);
 
@@ -47,9 +40,9 @@ impl<DataT: ConfigDataT> GuildConfig<DataT> {
         channel_id: ChannelId,
     ) -> Result<()> {
         let pins = channel_id.pins(chttp.1).await?;
-        let pinned_message = pins.into_iter().find_map(|m| {
-            (m.author.id == chttp.0.current_user().id && !m.attachments.is_empty()).then_some(m)
-        });
+        let pinned_message = pins
+            .into_iter()
+            .find_map(|m| (m.author.id == chttp.0.current_user().id && !m.attachments.is_empty()).then_some(m));
 
         match pinned_message {
             Some(m) => self.init_from_message(&chttp, &m).await,
@@ -88,8 +81,7 @@ impl<DataT: ConfigDataT> GuildConfig<DataT> {
 
         let bytes = file.read(chttp).await?;
         let old_str = String::from_utf8_lossy(&bytes);
-        let cache: DataT =
-            from_yaml_str(&old_str).inspect_err(|err| tracing::error!(?err)).unwrap_or_default();
+        let cache: DataT = from_yaml_str(&old_str).inspect_err(|err| tracing::error!(?err)).unwrap_or_default();
 
         let new_str = to_yaml_string(&cache)?;
         if old_str != new_str {
@@ -100,9 +92,10 @@ impl<DataT: ConfigDataT> GuildConfig<DataT> {
                 CONFIG_NAME,
                 "diff",
             );
-            let msg = serenity::CreateMessage::new().content(content).files(files).add_file(
-                CreateAttachment::bytes(old_str.as_bytes(), format!("old_{}", file.filename)),
-            );
+            let msg = serenity::CreateMessage::new()
+                .content(content)
+                .files(files)
+                .add_file(CreateAttachment::bytes(old_str.as_bytes(), format!("old_{}", file.filename)));
             if let Err(why) = message.channel_id.send_message(chttp, msg).await {
                 tracing::error!(%why, %old_str, "Failed to send old config");
             }
@@ -185,11 +178,7 @@ enum EditOperation {
 }
 
 /// Edit a config value in a modal dialog
-#[poise::command(
-    slash_command,
-    required_permissions = "MANAGE_GUILD",
-    default_member_permissions = "MANAGE_GUILD"
-)]
+#[poise::command(slash_command, required_permissions = "MANAGE_GUILD", default_member_permissions = "MANAGE_GUILD")]
 pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
     ctx: CmdContext<'_, D>,
     #[description = "Dot-separated config path"]
@@ -207,12 +196,8 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
 
     let Some(int) = match operation {
         Some(EditOperation::Show) => {
-            let (content, files) = code_block_or_file(
-                format!("Value of `{path}`:"),
-                value_str,
-                CONFIG_NAME,
-                CONFIG_EXT,
-            );
+            let (content, files) =
+                code_block_or_file(format!("Value of `{path}`:"), value_str, CONFIG_NAME, CONFIG_EXT);
             // I hate this, why are the builder interfaces so inconsistent :(
             let mut builder = CreateReply::new().content(content);
             for f in files {
@@ -230,8 +215,7 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
                 CreateQuickModal::new("Append").paragraph_field("Value"),
                 |root, inputs| {
                     let value = from_yaml_str(inputs.get(0).some()?).wrap_err("Invalid value")?;
-                    autocomplete_yaml::append_path(root, path.split("."), value)
-                        .ok_or_eyre("Path has become invalid")
+                    autocomplete_yaml::append_path(root, path.split("."), value).ok_or_eyre("Path has become invalid")
                 },
             )
             .await
@@ -257,13 +241,11 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
                 &ctx,
                 app.interaction.id,
                 &app.interaction.token,
-                CreateQuickModal::new("Edit").field(
-                    CreateInputText::new(InputTextStyle::Paragraph, "Value", "").value(value_str),
-                ),
+                CreateQuickModal::new("Edit")
+                    .field(CreateInputText::new(InputTextStyle::Paragraph, "Value", "").value(value_str)),
                 |root, inputs| {
                     let value = from_yaml_str(inputs.get(0).some()?).wrap_err("Invalid value")?;
-                    autocomplete_yaml::set_path(root, path.split("."), value)
-                        .ok_or_eyre("Path has become invalid")?;
+                    autocomplete_yaml::set_path(root, path.split("."), value).ok_or_eyre("Path has become invalid")?;
                     Ok(())
                 },
             )
@@ -277,14 +259,9 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
     let new_root = ctx.data().state().with(|cfg| to_yaml_value(cfg)).await?;
     let new_root_str = to_yaml_string(&new_root)?;
     let diff = diff(&root_str, &new_root_str);
-    let (content, files) =
-        code_block_or_file(format!("✏️ Wrote `{path}`:"), diff, CONFIG_NAME, "diff");
+    let (content, files) = code_block_or_file(format!("✏️ Wrote `{path}`:"), diff, CONFIG_NAME, "diff");
 
-    CreateInteractionResponseFollowup::new()
-        .content(content)
-        .files(files)
-        .execute(ctx, (None, &int.token))
-        .await?;
+    CreateInteractionResponseFollowup::new().content(content).files(files).execute(ctx, (None, &int.token)).await?;
 
     Ok(())
 }
@@ -296,10 +273,8 @@ async fn edit_in_modal<D: State<GuildConfig<impl ConfigDataT>>>(
     modal: CreateQuickModal,
     edit: impl FnOnce(&mut serde_yml::Value, Vec<String>) -> Result<()>,
 ) -> Result<Option<ModalInteraction>> {
-    let Some(modal_response) = modal
-        .timeout(Duration::from_secs(2 * 60))
-        .execute(ctx.serenity_context(), inter_id, inter_token)
-        .await?
+    let Some(modal_response) =
+        modal.timeout(Duration::from_secs(2 * 60)).execute(ctx.serenity_context(), inter_id, inter_token).await?
     else {
         return Ok(None);
     };
@@ -322,21 +297,11 @@ async fn edit_in_modal<D: State<GuildConfig<impl ConfigDataT>>>(
 }
 
 /// Restore a config backup
-#[poise::command(
-    prefix_command,
-    required_permissions = "MANAGE_GUILD",
-    default_member_permissions = "MANAGE_GUILD"
-)]
-pub async fn restore<D: State<GuildConfig<impl ConfigDataT>>>(
-    ctx: CmdContext<'_, D>,
-) -> Result<()> {
+#[poise::command(prefix_command, required_permissions = "MANAGE_GUILD", default_member_permissions = "MANAGE_GUILD")]
+pub async fn restore<D: State<GuildConfig<impl ConfigDataT>>>(ctx: CmdContext<'_, D>) -> Result<()> {
     let poise::Context::Prefix(pre) = &ctx else { return Ok(()) };
 
-    let attachment = pre
-        .msg
-        .attachments
-        .first()
-        .ok_or_eyre("You have to upload the backup alongside the command")?;
+    let attachment = pre.msg.attachments.first().ok_or_eyre("You have to upload the backup alongside the command")?;
 
     let bytes = attachment.download().await?;
     let new = from_yaml_str(&String::from_utf8_lossy(&bytes))?;
@@ -355,17 +320,13 @@ pub async fn restore<D: State<GuildConfig<impl ConfigDataT>>>(
     let old_str = to_yaml_string(&old)?;
 
     let diff = diff(&old_str, &new_str);
-    let (content, files) =
-        code_block_or_file("✏️ Restored:".to_string(), diff, CONFIG_NAME, "diff");
+    let (content, files) = code_block_or_file("✏️ Restored:".to_string(), diff, CONFIG_NAME, "diff");
 
     let mut reply = CreateReply::new().content(content);
     for f in files {
         reply = reply.attachment(f);
     }
-    reply = reply.attachment(CreateAttachment::bytes(
-        old_str.as_bytes(),
-        format!("old_{CONFIG_NAME}.{CONFIG_EXT}"),
-    ));
+    reply = reply.attachment(CreateAttachment::bytes(old_str.as_bytes(), format!("old_{CONFIG_NAME}.{CONFIG_EXT}")));
     ctx.send(reply).await?;
 
     Ok(())
@@ -379,8 +340,7 @@ async fn autocomplete_config<U: State<GuildConfig<impl ConfigDataT>>, E>(
         .state()
         .with(|cfg| {
             let root = to_yaml_value(cfg)?;
-            let choices =
-                autocomplete_yaml::autocomplete_value(&root, input).into_iter().take(25).collect();
+            let choices = autocomplete_yaml::autocomplete_value(&root, input).into_iter().take(25).collect();
             Ok(CreateAutocompleteResponse::new().set_choices(choices))
         })
         .await
@@ -402,9 +362,7 @@ mod autocomplete_yaml {
             serde_yml::Value::Mapping(obj) => {
                 obj.iter().filter_map(|(k, _v)| k.as_str().map(ToString::to_string)).collect()
             }
-            serde_yml::Value::Sequence(arr) => {
-                arr.iter().enumerate().map(|(i, _v)| i.to_string()).collect()
-            }
+            serde_yml::Value::Sequence(arr) => arr.iter().enumerate().map(|(i, _v)| i.to_string()).collect(),
             _ => vec![],
         });
 
@@ -426,10 +384,7 @@ mod autocomplete_yaml {
         }
     }
 
-    pub fn get_path(
-        mut root: &serde_yml::Value,
-        path: impl Iterator<Item = &str>,
-    ) -> Option<&serde_yml::Value> {
+    pub fn get_path(mut root: &serde_yml::Value, path: impl Iterator<Item = &str>) -> Option<&serde_yml::Value> {
         for key in path {
             let key = key.trim();
             if key.is_empty() {

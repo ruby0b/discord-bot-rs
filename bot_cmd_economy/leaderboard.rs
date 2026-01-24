@@ -9,10 +9,8 @@ use poise::serenity_prelude::{Colour, CreateEmbed, Mentionable};
 #[poise::command(slash_command, guild_only)]
 pub async fn leaderboard<D: With<ConfigT>>(ctx: CmdContext<'_, D>) -> Result<()> {
     let cur = Currency::read(ctx.data()).await?;
-    let mut accounts = ctx
-        .data()
-        .with_ok(|cfg| cfg.account.iter().map(|(id, account)| (*id, account.clone())).collect_vec())
-        .await?;
+    let mut accounts =
+        ctx.data().with_ok(|cfg| cfg.account.iter().map(|(id, account)| (*id, account.clone())).collect_vec()).await?;
 
     accounts.sort_by(|(_, u1), (_, u2)| u2.balance.cmp(&u1.balance));
 
@@ -22,8 +20,7 @@ pub async fn leaderboard<D: With<ConfigT>>(ctx: CmdContext<'_, D>) -> Result<()>
         .map(|(i, (id, u))| format!("{} {} {}", placement(i + 1), id.mention(), cur.fmt(u.balance)))
         .join("\n");
 
-    let embed =
-        CreateEmbed::new().title("Leaderboard").description(leaderboard).colour(Colour::DARK_GOLD);
+    let embed = CreateEmbed::new().title("Leaderboard").description(leaderboard).colour(Colour::DARK_GOLD);
 
     let reply = CreateReply::new().embed(embed);
 

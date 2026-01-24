@@ -59,10 +59,7 @@ where
     GuildConfigT: AsRef<ConfigT> + AsMut<ConfigT>,
     ConfigT: Clone,
 {
-    async fn with<Output>(
-        &self,
-        f: impl Send + for<'a> FnOnce(&'a ConfigT) -> Result<Output>,
-    ) -> Result<Output> {
+    async fn with<Output>(&self, f: impl Send + for<'a> FnOnce(&'a ConfigT) -> Result<Output>) -> Result<Output> {
         let config: &Arc<crate::config::GuildConfig<_>> = self.as_ref();
         config.with(|cfg| f(cfg.as_ref())).await
     }
