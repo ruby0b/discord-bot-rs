@@ -102,7 +102,7 @@ async fn periodic_region_changes(
 ) -> Result<()> {
     let config = data.with_ok(|c| c.clone()).await?;
     let guild_id: GuildId = *data.state();
-    let vc_to_users = {
+    let configured_users_by_vc = {
         let guild = guild_id.to_guild_cached(&ctx).some()?;
         config
             .users
@@ -113,13 +113,14 @@ async fn periodic_region_changes(
             .into_iter()
             .into_group_map()
     };
-    for (channel_id, user_ids) in vc_to_users {
+    for (channel_id, user_ids) in configured_users_by_vc {
         let state: Arc<StateT> = data.state();
-        let Some(elapsed) =
-            user_ids.iter().filter_map(|u| state.last_region_change.get(u)).map(|x| x.when.elapsed()).max()
-        else {
-            continue;
-        };
+        let elapsed = user_ids
+            .iter()
+            .filter_map(|u| state.last_region_change.get(u))
+            .map(|x| x.when.elapsed())
+            .max()
+            .unwrap_or(Duration::MAX);
         if elapsed < config.cooldown.to_std()? {
             continue;
         }
