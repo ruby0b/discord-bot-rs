@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Fuwn/yae/refs/heads/main/yae.schema.json",
+  "crane": {
+    "url": "https://github.com/ipetkov/crane/archive/master.tar.gz",
+    "sha256": "0bn5a24fb9jfdsrnsgvxvd7rjfpgaxqd5gkrnln9xc3yjqv5mc0f",
+    "hash": "",
+    "unpack": true,
+    "type": "git",
+    "version": "master",
+    "url_template": "https://github.com/ipetkov/crane/archive/{version}.tar.gz"
+  },
+  "fenix": {
+    "url": "https://github.com/nix-community/fenix/archive/monthly.tar.gz",
+    "sha256": "1q9bjd2qqqsan2r9blm9k6d8mkwi7fq5v3spm4zbng62qpp5w6hh",
+    "hash": "",
+    "unpack": true,
+    "type": "git",
+    "version": "monthly",
+    "url_template": "https://github.com/nix-community/fenix/archive/{version}.tar.gz"
+  },
+  "nixpkgs": {
+    "url": "https://github.com/NixOS/nixpkgs/archive/nixos-unstable.tar.gz",
+    "sha256": "09b8kz8ycz6g88br8bn29ry3b5sj1azx008s01mz7q3indjbi92l",
+    "hash": "",
+    "unpack": true,
+    "type": "git",
+    "version": "nixos-unstable",
+    "url_template": "https://github.com/NixOS/nixpkgs/archive/{version}.tar.gz"
+  }
+}
