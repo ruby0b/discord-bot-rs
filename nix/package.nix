@@ -1,7 +1,7 @@
 {
   alsa-lib,
   cmake,
-  craneLib,
+  craneFenix,
   d2,
   imagemagick,
   lib,
@@ -15,13 +15,13 @@
 let
   main = "discord-bot-rs";
 in
-craneLib.buildPackage {
+craneFenix.buildPackage {
   pname = main;
   src = lib.cleanSourceWith {
     src = ../.;
     name = "source";
     filter =
-      path: type: (builtins.match ".*src/.*" path != null) || (craneLib.filterCargoSources path type);
+      path: type: (builtins.match ".*src/.*" path != null) || (craneFenix.filterCargoSources path type);
   };
   strictDeps = true;
   doCheck = false;

@@ -36,7 +36,7 @@ in
         HOME = home;
       };
       serviceConfig = {
-        ExecStart = "${pkgs.lib.getExe pkgs.${name}}";
+        ExecStart = "${pkgs.lib.getExe pkgs.discord-bot-rs}";
         Restart = "always";
         RestartSec = 30;
         DynamicUser = true;
