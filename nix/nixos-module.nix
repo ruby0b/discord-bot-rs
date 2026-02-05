@@ -1,3 +1,4 @@
+scope:
 {
   lib,
   config,
@@ -15,6 +16,10 @@ in
     enable = mkOption {
       type = types.bool;
       default = false;
+    };
+    package = lib.mkOption {
+      type = lib.types.package;
+      default = (scope pkgs.newScope).discord-bot-rs;
     };
     autostart = mkOption {
       type = types.bool;
@@ -36,7 +41,7 @@ in
         HOME = home;
       };
       serviceConfig = {
-        ExecStart = "${pkgs.lib.getExe pkgs.discord-bot-rs}";
+        ExecStart = "${pkgs.lib.getExe cfg.package}";
         Restart = "always";
         RestartSec = 30;
         DynamicUser = true;

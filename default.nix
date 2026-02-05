@@ -20,8 +20,9 @@ let
     rstrict = self.callPackage ./nix/rstrict.nix { };
     discord-bot-rs = self.callPackage ./nix/package.nix { };
   };
+  scope = callPackage: lib.makeScope callPackage packages;
 in
 {
-  packages = lib.makeScope pkgs.newScope packages;
-  nixosModules.default = ./nix/nixos-module.nix;
+  packages = scope pkgs.newScope;
+  nixosModules.default = import ./nix/nixos-module.nix scope;
 }
