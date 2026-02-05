@@ -2,27 +2,19 @@
   yae ? (builtins.fromJSON (builtins.readFile ./yae.json)),
   sources ? {
     nixpkgs = builtins.fetchTarball { inherit (yae.nixpkgs) url sha256; };
+    nixpkgs-lib = builtins.fetchTarball { inherit (yae.nixpkgs-lib) url sha256; };
     crane = builtins.fetchTarball { inherit (yae.crane) url sha256; };
     fenix = builtins.fetchTarball { inherit (yae.fenix) url sha256; };
   },
   system ? builtins.currentSystem,
   pkgs ? import sources.nixpkgs { inherit system; },
-  lib ? pkgs.lib,
+  lib ? import "${sources.nixpkgs-lib}/lib",
   ...
 }:
 let
-  packages = self: {
-    fenix = self.callPackage (import sources.fenix) { };
-    crane = self.callPackage (import "${sources.crane}/lib") { };
-    craneFenix = self.callPackage (
-      { crane, fenix }: crane.overrideToolchain fenix.minimal.toolchain
-    ) { };
-    rstrict = self.callPackage ./nix/rstrict.nix { };
-    discord-bot-rs = self.callPackage ./nix/package.nix { };
-  };
-  scope = callPackage: lib.makeScope callPackage packages;
+  makePackages = pkgs: lib.makeScope pkgs.newScope (import ./nix/scope.nix sources);
 in
 {
-  packages = scope pkgs.newScope;
-  nixosModules.default = import ./nix/nixos-module.nix scope;
+  packages = makePackages pkgs;
+  nixosModules.default = import ./nix/nixos-module.nix makePackages;
 }

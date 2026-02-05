@@ -26,5 +26,14 @@
     "type": "git",
     "version": "nixos-unstable",
     "url_template": "https://github.com/NixOS/nixpkgs/archive/{version}.tar.gz"
+  },
+  "nixpkgs-lib": {
+    "url": "https://github.com/nix-community/nixpkgs.lib/archive/master.tar.gz",
+    "sha256": "14rs95sivciv53zk8h3y4rp4pn17nwq9y6ch1z2qvzpqwyc344bh",
+    "hash": "",
+    "unpack": true,
+    "type": "git",
+    "version": "master",
+    "url_template": "https://github.com/nix-community/nixpkgs.lib/archive/{version}.tar.gz"
   }
 }

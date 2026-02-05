@@ -1,4 +1,4 @@
-scope:
+makePackages:
 {
   lib,
   config,
@@ -19,7 +19,7 @@ in
     };
     package = lib.mkOption {
       type = lib.types.package;
-      default = (scope pkgs.newScope).discord-bot-rs;
+      default = (makePackages pkgs).discord-bot-rs;
     };
     autostart = mkOption {
       type = types.bool;
