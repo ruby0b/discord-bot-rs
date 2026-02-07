@@ -13,8 +13,10 @@
 }:
 let
   makePackages = pkgs: lib.makeScope pkgs.newScope (import ./nix/scope.nix sources);
+  packages = makePackages pkgs;
 in
 {
-  packages = makePackages pkgs;
+  inherit packages;
+  devShells.default = packages.craneFenix.devShell { inputsFrom = [ packages.discord-bot-rs ]; };
   nixosModules.default = import ./nix/nixos-module.nix makePackages;
 }
