@@ -1,4 +1,3 @@
-#![feature(btree_extract_if)]
 #![allow(clippy::mutable_key_type)]
 
 mod ask;

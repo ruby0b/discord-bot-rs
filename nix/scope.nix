@@ -5,5 +5,5 @@ sources: self: {
     { crane, fenix }: crane.overrideToolchain fenix.complete.toolchain
   ) { };
   rstrict = self.callPackage ./rstrict.nix { };
-  discord-bot-rs = self.callPackage ./package.nix { };
+  discord-bot-rs = self.callPackage ./discord-bot-rs.nix { };
 }

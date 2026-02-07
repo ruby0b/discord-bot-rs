@@ -20,6 +20,8 @@ async fn main() -> Result<()> {
     crate::log::init_tracing();
     unsafe { crate::log::init_eyre()? }
 
+    rustls::crypto::ring::default_provider().install_default().expect("Failed to install ring as rustls provider");
+
     // Read required config from environment variables (or .env file)
     let config_url = dotenv::var("BOT_CONFIG_CHANNEL").wrap_err("BOT_CONFIG_CHANNEL not set")?;
     let token = dotenv::var("BOT_TOKEN").wrap_err("BOT_TOKEN not set")?;

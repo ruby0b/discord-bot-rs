@@ -10,7 +10,6 @@ use tokio::sync::mpsc;
 pub(crate) enum UpdateCommand {
     Update(MessageId),
     Remove(MessageId),
-    Shutdown,
 }
 
 pub(crate) async fn ask_update_worker(ctx: Context, data: impl With<ConfigT>, mut rx: mpsc::Receiver<UpdateCommand>) {
@@ -25,10 +24,6 @@ pub(crate) async fn ask_update_worker(ctx: Context, data: impl With<ConfigT>, mu
                 UpdateCommand::Remove(message_id) => {
                     tracing::debug!("Removing ask {message_id}");
                     remove_ask(&ctx, &data, message_id).await
-                }
-                UpdateCommand::Shutdown => {
-                    tracing::debug!("Shutting down ask update worker");
-                    break;
                 }
             }
         } {

@@ -12,7 +12,6 @@ chrono.workspace = true
 dashmap.workspace = true
 eyre.workspace = true
 fancy-regex.workspace = true
-image_search.workspace = true
 itertools.workspace = true
 poise.workspace = true
 reqwest.workspace = true

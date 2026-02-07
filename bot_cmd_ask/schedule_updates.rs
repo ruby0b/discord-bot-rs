@@ -97,10 +97,11 @@ async fn fetch_game_thumbnail(data: &impl With<ConfigT>, msg_id: MessageId) -> R
     .await
 }
 
-async fn search_image(query: &str) -> Result<Option<String>> {
-    let search_result = image_search::urls(image_search::Arguments::new(query, 1)).await?;
-    let thumbnail_url = search_result.first().cloned();
-    Ok(thumbnail_url)
+async fn search_image(_query: &str) -> Result<Option<String>> {
+    // todo: image_search is broken and used native tls, maybe just do a request ourselves
+    // let search_result = image_search::urls(image_search::Arguments::new(query, 1)).await?;
+    // let thumbnail_url = search_result.first().cloned();
+    Ok(None)
 }
 
 async fn validate_image_url(thumbnail_url: &str) -> Result<()> {

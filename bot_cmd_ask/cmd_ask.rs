@@ -17,7 +17,8 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
     #[description = "Start time"]
     #[autocomplete = bot_core::autocomplete::time]
     start_time: Option<NaiveTime>,
-    #[description = "Link to the game"] url: Option<Url>,
+    #[description = "Link to the game"]
+    url: Option<Url>,
     #[description = "Game description"] description: Option<String>,
 ) -> Result<()> {
     let (default, expiration) = ctx
