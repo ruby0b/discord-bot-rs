@@ -157,16 +157,16 @@ impl<DataT: ConfigDataT> GuildConfig<DataT> {
 const CONFIG_NAME: &str = "config";
 const CONFIG_EXT: &str = "yaml";
 
-fn to_yaml_value<T: Serialize>(x: T) -> Result<serde_yml::Value> {
-    Ok(serde_yml::to_value(x)?)
+fn to_yaml_value<T: Serialize>(x: T) -> Result<serde_yaml_ng::Value> {
+    Ok(serde_yaml_ng::to_value(x)?)
 }
 
 fn to_yaml_string<T: Serialize>(x: &T) -> Result<String> {
-    Ok(serde_yml::to_string(x)?)
+    Ok(serde_yaml_ng::to_string(x)?)
 }
 
 fn from_yaml_str<T: for<'a> Deserialize<'a>>(s: &str) -> Result<T> {
-    Ok(serde_yml::from_str(s)?)
+    Ok(serde_yaml_ng::from_str(s)?)
 }
 
 #[derive(Clone, Copy, Debug, ChoiceParameter)]
@@ -271,7 +271,7 @@ async fn edit_in_modal<D: State<GuildConfig<impl ConfigDataT>>>(
     inter_id: InteractionId,
     inter_token: &str,
     modal: CreateQuickModal,
-    edit: impl FnOnce(&mut serde_yml::Value, Vec<String>) -> Result<()>,
+    edit: impl FnOnce(&mut serde_yaml_ng::Value, Vec<String>) -> Result<()>,
 ) -> Result<Option<ModalInteraction>> {
     let Some(modal_response) =
         modal.timeout(Duration::from_secs(2 * 60)).execute(ctx.serenity_context(), inter_id, inter_token).await?
@@ -351,18 +351,19 @@ async fn autocomplete_config<U: State<GuildConfig<impl ConfigDataT>>, E>(
 mod autocomplete_yaml {
     use itertools::Itertools as _;
     use poise::serenity_prelude::all::AutocompleteChoice;
+    use serde_yaml_ng::Value;
     use std::iter::once;
 
-    pub fn autocomplete_value(root: &serde_yml::Value, input: &str) -> Vec<AutocompleteChoice> {
+    pub fn autocomplete_value(root: &Value, input: &str) -> Vec<AutocompleteChoice> {
         let path: Vec<&str> = input.split(".").collect();
         let (last, rest) = path.split_last().unwrap_or((&"", &[]));
         let value = get_path(root, rest.iter().copied());
 
         let keys: Vec<String> = value.map_or(vec![], |v| match v {
-            serde_yml::Value::Mapping(obj) => {
+            Value::Mapping(obj) => {
                 obj.iter().filter_map(|(k, _v)| k.as_str().map(ToString::to_string)).collect()
             }
-            serde_yml::Value::Sequence(arr) => arr.iter().enumerate().map(|(i, _v)| i.to_string()).collect(),
+            Value::Sequence(arr) => arr.iter().enumerate().map(|(i, _v)| i.to_string()).collect(),
             _ => vec![],
         });
 
@@ -384,17 +385,17 @@ mod autocomplete_yaml {
         }
     }
 
-    pub fn get_path(mut root: &serde_yml::Value, path: impl Iterator<Item = &str>) -> Option<&serde_yml::Value> {
+    pub fn get_path(mut root: &Value, path: impl Iterator<Item = &str>) -> Option<&Value> {
         for key in path {
             let key = key.trim();
             if key.is_empty() {
                 continue;
             }
             match root {
-                serde_yml::Value::Mapping(t) => {
+                Value::Mapping(t) => {
                     root = t.get(key)?;
                 }
-                serde_yml::Value::Sequence(arr) => {
+                Value::Sequence(arr) => {
                     if let Ok(index) = key.parse::<usize>() {
                         root = arr.get(index)?;
                     } else {
@@ -409,19 +410,19 @@ mod autocomplete_yaml {
     }
 
     pub fn get_path_mut(
-        mut root: &mut serde_yml::Value,
+        mut root: &mut Value,
         path: impl Iterator<Item = &str>,
-    ) -> Option<&mut serde_yml::Value> {
+    ) -> Option<&mut Value> {
         for key in path {
             let key = key.trim();
             if key.is_empty() {
                 continue;
             }
             match root {
-                serde_yml::Value::Mapping(t) => {
+                Value::Mapping(t) => {
                     root = t.get_mut(key)?;
                 }
-                serde_yml::Value::Sequence(arr) => {
+                Value::Sequence(arr) => {
                     if let Ok(index) = key.parse::<usize>() {
                         root = arr.get_mut(index)?;
                     } else {
@@ -437,21 +438,21 @@ mod autocomplete_yaml {
 
     #[must_use]
     pub fn set_path(
-        root: &mut serde_yml::Value,
+        root: &mut Value,
         path: impl Iterator<Item = &str>,
-        new_value: serde_yml::Value,
-    ) -> Option<serde_yml::Value> {
+        new_value: Value,
+    ) -> Option<Value> {
         Some(std::mem::replace(get_path_mut(root, path)?, new_value))
     }
 
     #[must_use]
     pub fn append_path(
-        root: &mut serde_yml::Value,
+        root: &mut Value,
         path: impl Iterator<Item = &str>,
-        new_value: serde_yml::Value,
+        new_value: Value,
     ) -> Option<()> {
         match get_path_mut(root, path)? {
-            serde_yml::Value::Sequence(arr) => {
+            Value::Sequence(arr) => {
                 arr.push(new_value);
                 Some(())
             }
@@ -461,14 +462,14 @@ mod autocomplete_yaml {
 
     #[must_use]
     pub fn insert_path(
-        root: &mut serde_yml::Value,
+        root: &mut Value,
         path: impl Iterator<Item = &str>,
         new_key: &str,
-        new_value: serde_yml::Value,
+        new_value: Value,
     ) -> Option<()> {
         match get_path_mut(root, path)? {
-            serde_yml::Value::Mapping(obj) => {
-                obj.insert(serde_yml::Value::String(new_key.to_string()), new_value);
+            Value::Mapping(obj) => {
+                obj.insert(Value::String(new_key.to_string()), new_value);
                 Some(())
             }
             _ => None,

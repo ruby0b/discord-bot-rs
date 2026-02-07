@@ -23,8 +23,8 @@ async fn main() -> Result<()> {
     rustls::crypto::ring::default_provider().install_default().expect("Failed to install ring as rustls provider");
 
     // Read required config from environment variables (or .env file)
-    let config_url = dotenv::var("BOT_CONFIG_CHANNEL").wrap_err("BOT_CONFIG_CHANNEL not set")?;
-    let token = dotenv::var("BOT_TOKEN").wrap_err("BOT_TOKEN not set")?;
+    let config_url = dotenvy::var("BOT_CONFIG_CHANNEL").wrap_err("BOT_CONFIG_CHANNEL not set")?;
+    let token = dotenvy::var("BOT_TOKEN").wrap_err("BOT_TOKEN not set")?;
 
     let (cfg_guild, cfg_channel): (GuildId, ChannelId) = (|| -> Result<_> {
         let url = url::Url::parse(&config_url)?;
