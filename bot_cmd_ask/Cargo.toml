@@ -17,6 +17,7 @@ reqwest.workspace = true
 scraper.workspace = true
 sensible.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 url.workspace = true

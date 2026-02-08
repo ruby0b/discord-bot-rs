@@ -41,6 +41,7 @@ pub struct ConfigT {
 #[derive(Default)]
 pub struct StateT {
     update_sender: OnceCell<mpsc::Sender<UpdateCommand>>,
+    serpapi_token: OnceCell<String>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -52,7 +53,10 @@ struct AskDefaults {
     thumbnail_url: Option<String>,
 }
 
-pub async fn setup(ctx: Context, data: impl With<ConfigT> + State<StateT>) -> Result<()> {
+pub async fn setup(ctx: Context, data: impl With<ConfigT> + State<StateT>, serpapi_token: String) -> Result<()> {
+    {
+        data.state().serpapi_token.set(serpapi_token)?;
+    }
     {
         tracing::debug!("Spawning ask update worker");
         let (tx, rx) = mpsc::channel::<UpdateCommand>(100);

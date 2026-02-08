@@ -27,6 +27,7 @@ in
     };
     token = mkOption { type = types.uniq types.str; };
     config_url = mkOption { type = types.uniq types.str; };
+    serpapi_token = mkOption { type = types.uniq types.str; };
   };
 
   config = mkIf cfg.enable {
@@ -36,9 +37,10 @@ in
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       environment = {
+        HOME = home;
         BOT_TOKEN = cfg.token;
         BOT_CONFIG_CHANNEL = cfg.config_url;
-        HOME = home;
+        SERPAPI_TOKEN = cfg.serpapi_token;
       };
       serviceConfig = {
         ExecStart = "${pkgs.lib.getExe cfg.package}";

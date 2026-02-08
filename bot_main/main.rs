@@ -24,7 +24,8 @@ async fn main() -> Result<()> {
 
     // Read required config from environment variables (or .env file)
     let config_url = dotenvy::var("BOT_CONFIG_CHANNEL").wrap_err("BOT_CONFIG_CHANNEL not set")?;
-    let token = dotenvy::var("BOT_TOKEN").wrap_err("BOT_TOKEN not set")?;
+    let bot_token = dotenvy::var("BOT_TOKEN").wrap_err("BOT_TOKEN not set")?;
+    let serpapi_token = dotenvy::var("SERPAPI_TOKEN").wrap_err("SERPAPI_TOKEN not set")?;
 
     let (cfg_guild, cfg_channel): (GuildId, ChannelId) = (|| -> Result<_> {
         let url = url::Url::parse(&config_url)?;
@@ -153,7 +154,7 @@ async fn main() -> Result<()> {
 
                 bot_core::hash_store::purge_expired().await?;
                 bot_cmd_tts::setup(ctx.clone(), data.clone()).await?;
-                bot_cmd_ask::setup(ctx.clone(), data.clone()).await?;
+                bot_cmd_ask::setup(ctx.clone(), data.clone(), serpapi_token).await?;
                 bot_cmd_bedtime::setup(ctx.clone(), data.clone()).await?;
                 bot_cmd_periodic_region_change::setup(ctx.clone(), data.clone()).await?;
 
@@ -163,7 +164,7 @@ async fn main() -> Result<()> {
         .options(options)
         .build();
 
-    Client::builder(token, GatewayIntents::all())
+    Client::builder(bot_token, GatewayIntents::all())
         .framework(framework)
         .cache_settings(Settings::default())
         .register_songbird()

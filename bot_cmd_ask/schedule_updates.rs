@@ -2,9 +2,8 @@ use crate::update_worker::UpdateCommand;
 use crate::{Ask, ConfigT, StateT};
 use bot_core::{OptionExt as _, State, With};
 use chrono::{TimeDelta, Utc};
-use eyre::{Context, OptionExt as _, Result, ensure};
+use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::MessageId;
-use reqwest::header::CONTENT_TYPE;
 
 pub(crate) async fn schedule_ask_updates(
     data: &(impl With<ConfigT> + State<StateT>),
@@ -59,7 +58,7 @@ async fn send(data: &impl State<StateT>, cmd: UpdateCommand) -> Result<()> {
 }
 
 /// Search for a thumbnail for the ask message
-async fn fetch_game_thumbnail(data: &impl With<ConfigT>, msg_id: MessageId) -> Result<()> {
+async fn fetch_game_thumbnail(data: &(impl With<ConfigT> + State<StateT>), msg_id: MessageId) -> Result<()> {
     let thumbnail_url = {
         let Some(ask) = data.with_ok(|cfg| cfg.asks.get(&msg_id).cloned()).await? else {
             return Ok(());
@@ -77,15 +76,13 @@ async fn fetch_game_thumbnail(data: &impl With<ConfigT>, msg_id: MessageId) -> R
         let thumbnail_url = {
             let mut found_url: Option<String> = None;
             for query in &queries {
-                if let Some(url) = search_image(query).await? {
+                if let Some(url) = search_image(query, data.state().serpapi_token.get().some()?).await? {
                     found_url = Some(url);
                     break;
                 }
             }
             found_url.ok_or_eyre(format!("No images found for queries: {queries:?}"))?
         };
-
-        validate_image_url(&thumbnail_url).await.wrap_err("Invalid thumbnail URL")?;
 
         thumbnail_url
     };
@@ -97,23 +94,27 @@ async fn fetch_game_thumbnail(data: &impl With<ConfigT>, msg_id: MessageId) -> R
     .await
 }
 
-async fn search_image(_query: &str) -> Result<Option<String>> {
-    // todo: image_search is broken and used native tls, maybe just do a request ourselves
-    // let search_result = image_search::urls(image_search::Arguments::new(query, 1)).await?;
-    // let thumbnail_url = search_result.first().cloned();
-    Ok(None)
-}
-
-async fn validate_image_url(thumbnail_url: &str) -> Result<()> {
-    let response = reqwest::get(thumbnail_url).await?;
-    let content_type = response.headers().get(CONTENT_TYPE).ok_or_eyre("No content type")?.to_str()?;
-    ensure!(
-        matches!(content_type, "image/jpeg" | "image/png" | "image/webp" | "image/gif"),
-        "Not an image content type: {content_type}"
-    );
-    let size = response.content_length();
-    ensure!(size.is_some_and(|l| l > 50), "Suspiciously small image of size {size:?}");
-    Ok(())
+async fn search_image(query: &str, serpapi_token: &str) -> Result<Option<String>> {
+    let result = reqwest::Client::new()
+        .get("https://serpapi.com/search")
+        .query(&[("api_key", serpapi_token), ("engine", "google_images"), ("hl", "en"), ("gl", "us"), ("q", query)])
+        .send()
+        .await?
+        .json::<serde_json::Value>()
+        .await?;
+    Ok((|| {
+        Some(
+            result
+                .as_object()?
+                .get("images_results")?
+                .as_array()?
+                .first()?
+                .as_object()?
+                .get("original")?
+                .as_str()?
+                .to_string(),
+        )
+    })())
 }
 
 /// Fetch a description for the game

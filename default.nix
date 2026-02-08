@@ -17,6 +17,11 @@ let
 in
 {
   inherit packages;
-  devShells.default = packages.craneFenix.devShell { inputsFrom = [ packages.discord-bot-rs ]; };
+  devShells.default = pkgs.mkShell {
+    # todo: doesn't do what I'd expect, e.g. imagemagick is not in path
+    inputsFrom = [ packages.discord-bot-rs ];
+    packages = [ packages.fenix.complete.toolchain ];
+    env = { inherit (packages.discord-bot-rs) RUSTFLAGS; };
+  };
   nixosModules.default = import ./nix/nixos-module.nix makePackages;
 }
