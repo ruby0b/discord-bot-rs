@@ -4,6 +4,7 @@ use eyre::Result;
 use itertools::Itertools;
 use poise::CreateReply;
 use poise::serenity_prelude::{Colour, CreateEmbed, Mentionable};
+use std::cmp::Reverse;
 
 /// Check the economy leaderboard
 #[poise::command(slash_command, guild_only)]
@@ -12,7 +13,7 @@ pub async fn leaderboard<D: With<ConfigT>>(ctx: CmdContext<'_, D>) -> Result<()>
     let mut accounts =
         ctx.data().with_ok(|cfg| cfg.account.iter().map(|(id, account)| (*id, account.clone())).collect_vec()).await?;
 
-    accounts.sort_by(|(_, u1), (_, u2)| u2.balance.cmp(&u1.balance));
+    accounts.sort_by_key(|(_, account)| Reverse(account.balance));
 
     let leaderboard = accounts
         .iter()

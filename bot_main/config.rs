@@ -360,9 +360,7 @@ mod autocomplete_yaml {
         let value = get_path(root, rest.iter().copied());
 
         let keys: Vec<String> = value.map_or(vec![], |v| match v {
-            Value::Mapping(obj) => {
-                obj.iter().filter_map(|(k, _v)| k.as_str().map(ToString::to_string)).collect()
-            }
+            Value::Mapping(obj) => obj.iter().filter_map(|(k, _v)| k.as_str().map(ToString::to_string)).collect(),
             Value::Sequence(arr) => arr.iter().enumerate().map(|(i, _v)| i.to_string()).collect(),
             _ => vec![],
         });
@@ -409,10 +407,7 @@ mod autocomplete_yaml {
         Some(root)
     }
 
-    pub fn get_path_mut(
-        mut root: &mut Value,
-        path: impl Iterator<Item = &str>,
-    ) -> Option<&mut Value> {
+    pub fn get_path_mut(mut root: &mut Value, path: impl Iterator<Item = &str>) -> Option<&mut Value> {
         for key in path {
             let key = key.trim();
             if key.is_empty() {
@@ -437,20 +432,12 @@ mod autocomplete_yaml {
     }
 
     #[must_use]
-    pub fn set_path(
-        root: &mut Value,
-        path: impl Iterator<Item = &str>,
-        new_value: Value,
-    ) -> Option<Value> {
+    pub fn set_path(root: &mut Value, path: impl Iterator<Item = &str>, new_value: Value) -> Option<Value> {
         Some(std::mem::replace(get_path_mut(root, path)?, new_value))
     }
 
     #[must_use]
-    pub fn append_path(
-        root: &mut Value,
-        path: impl Iterator<Item = &str>,
-        new_value: Value,
-    ) -> Option<()> {
+    pub fn append_path(root: &mut Value, path: impl Iterator<Item = &str>, new_value: Value) -> Option<()> {
         match get_path_mut(root, path)? {
             Value::Sequence(arr) => {
                 arr.push(new_value);

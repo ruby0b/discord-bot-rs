@@ -1,7 +1,7 @@
 use bot_core::{EvtContext, With};
 use eyre::Result;
 use poise::serenity_prelude::{Builder, CreateAttachment, EditRole, Message, RoleId, UserId, parse_emoji};
-use rand::Rng;
+use rand::RngExt;
 use std::collections::BTreeMap;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Default)]
@@ -32,7 +32,7 @@ pub async fn message<D: With<ConfigT>>(ctx: EvtContext<'_, D>, message: &Message
         })
         .await?
         .into_iter()
-        .filter(|(_, c)| rand::rng().random_bool(*c))
+        .filter(|&(_, c)| rand::rng().random_bool(c))
         .map(|(r, _)| r)
         .collect::<Vec<_>>();
 
