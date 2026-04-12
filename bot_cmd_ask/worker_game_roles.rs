@@ -58,7 +58,8 @@ async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> 
     // prioritize removing roles from users (opt-out) and use the remaining request budget for adding roles to users
     let role_remove_requests =
         build_role_requests(ctx, guild_id, &games, &existing_game_roles, |member, game, role_id| {
-            game.opted_out_users.contains(&member.user.id) && member.roles.contains(&role_id)
+            member.roles.contains(&role_id)
+                && (!member.roles.contains(&game.parent_role) || game.opted_out_users.contains(&member.user.id))
         })?;
     let requests_per_minute_left = ROLE_ADD_REMOVE_PER_MINUTE.saturating_sub(role_remove_requests.len());
     for (user_id, role_id, name) in role_remove_requests.into_iter().take(ROLE_ADD_REMOVE_PER_MINUTE) {
@@ -68,9 +69,8 @@ async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> 
 
     let role_add_requests =
         build_role_requests(ctx, guild_id, &games, &existing_game_roles, |member, game, role_id| {
-            !game.opted_out_users.contains(&member.user.id)
-                && member.roles.contains(&game.parent_role)
-                && !member.roles.contains(&role_id)
+            !member.roles.contains(&role_id)
+                && (member.roles.contains(&game.parent_role) && !game.opted_out_users.contains(&member.user.id))
         })?;
     for (user_id, role_id, name) in role_add_requests.into_iter().take(requests_per_minute_left) {
         tracing::info!("Adding role {name} to member {}", safe_name(ctx, user_id));
