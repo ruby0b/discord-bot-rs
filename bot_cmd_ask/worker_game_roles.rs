@@ -8,6 +8,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 use tokio::select;
 use tokio::sync::mpsc;
+use tokio::time::sleep;
 
 #[derive(Debug)]
 pub(crate) enum Command {
@@ -25,7 +26,7 @@ pub(crate) async fn work(ctx: Context, data: impl With<ConfigT> + State<GuildId>
                     }
                 }
             }
-            _ = tokio::time::sleep(Duration::from_secs(60)) => {
+            _ = sleep(Duration::from_secs(30)) => {
                 tracing::trace!("Periodic update");
                 update(&ctx, &data).await
             }
