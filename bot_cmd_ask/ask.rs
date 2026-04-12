@@ -18,6 +18,7 @@ pub(crate) struct Ask {
     pub thumbnail_url: Option<String>,
     pub channel_id: ChannelId,
     pub role_id: Option<RoleId>,
+    pub known_game: Option<String>,
     #[serde(with = "chrono::serde::ts_seconds")]
     pub start_time: DateTime<Utc>,
     pub pinged: bool,
@@ -83,12 +84,15 @@ impl Ask {
     }
 
     pub(crate) fn action_row(&self) -> CreateActionRow {
-        CreateActionRow::Buttons(vec![
+        let mut buttons = vec![
             CreateButton::new(JOIN_BUTTON_ID).style(ButtonStyle::Success).disabled(self.full()).label("Join"),
             CreateButton::new(DECLINE_BUTTON_ID).style(ButtonStyle::Danger).label("Decline"),
             CreateButton::new(LEAVE_BUTTON_ID).style(ButtonStyle::Secondary).label("Leave"),
-            CreateButton::new(TOGGLE_GAME_ROLE_BUTTON_ID).style(ButtonStyle::Secondary).emoji('🔔'),
-        ])
+        ];
+        if self.known_game.is_some() {
+            buttons.push(CreateButton::new(TOGGLE_GAME_ROLE_BUTTON_ID).style(ButtonStyle::Secondary).emoji('🔔'));
+        }
+        CreateActionRow::Buttons(buttons)
     }
 
     pub(crate) fn ping(&mut self, msg_id: MessageId) -> Option<CreateMessage> {

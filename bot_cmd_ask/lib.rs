@@ -50,13 +50,13 @@ pub struct StateT {
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Game {
-    parent_role: RoleId,
+    parent_role: String,
     title_pattern: LiteralRegex,
     defaults: GameDefaults,
     opted_out_users: BTreeSet<UserId>,
 }
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 struct GameDefaults {
     min_players: Option<u32>,
     max_players: Option<u32>,

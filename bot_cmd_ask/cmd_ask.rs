@@ -51,6 +51,7 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
         thumbnail_url: defaults.as_ref().and_then(|d| d.thumbnail_url.clone()),
         channel_id: ctx.channel_id(),
         role_id,
+        known_game: game_name,
         start_time: start_time.and_then(naive_time_to_next_datetime).map_or_else(Utc::now, |dt| dt.to_utc()),
         pinged: false,
     };

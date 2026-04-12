@@ -93,27 +93,15 @@ pub async fn toggle_game_role(
     component: &ComponentInteraction,
 ) -> Result<()> {
     let user_id = component.user.id;
-    let role_id = ctx
-        .user_data
-        .with(|cfg| {
-            let ask = cfg.asks.get(&component.message.id).ok_or_eyre("Unknown ask")?;
-            let role_id = ask.role_id.ok_or_eyre("No role was pinged, so you can't unsubscribe from this ask.")?;
-            Ok(role_id)
-        })
-        .await?;
-
-    let role_name = {
-        let guild = ctx.serenity_context.cache.guild(component.guild_id.some()?).some()?;
-        guild.roles.get(&role_id).ok_or_eyre(format!("Could not find role with id {role_id}"))?.name.clone()
-    };
-
     let response = ctx
         .user_data
         .with_mut(|cfg| {
-            let game = cfg.games.get_mut(&role_name).ok_or_eyre("No game role is associated with this ask.")?;
+            let ask = cfg.asks.get(&component.message.id).ok_or_eyre("Unknown ask")?;
+            let game_name = ask.known_game.as_deref().ok_or_eyre("No game role is associated with this ask.")?;
+            let game = cfg.games.get_mut(game_name).ok_or_eyre("Unexpected: The game no longer exists.")?;
             Ok(match game.opted_out_users.toggle(user_id) {
-                ToggleResult::Inserted => format!("🔕 Unsubscribed from {role_name}"),
-                ToggleResult::Removed => format!("🔔 Subscribed to {role_name}"),
+                ToggleResult::Inserted => format!("🔕 Unsubscribed from {game_name}"),
+                ToggleResult::Removed => format!("🔔 Subscribed to {game_name}"),
             })
         })
         .await?;
