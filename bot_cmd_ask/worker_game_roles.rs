@@ -65,7 +65,7 @@ async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> 
     let requests_per_minute_left = ROLE_ADD_REMOVE_PER_MINUTE.saturating_sub(role_remove_requests.len());
     for (user_id, role_id, name) in role_remove_requests.into_iter().take(ROLE_ADD_REMOVE_PER_MINUTE) {
         tracing::info!("Removing role {name} from member {} due to opt-out", safe_name(ctx, user_id));
-        ctx.http.add_member_role(guild_id, user_id, role_id, Some("Game role opt-out")).await?;
+        ctx.http.remove_member_role(guild_id, user_id, role_id, Some("Game role opt-out")).await?;
     }
 
     let role_add_requests =

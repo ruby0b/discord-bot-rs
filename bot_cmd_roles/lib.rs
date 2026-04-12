@@ -249,7 +249,7 @@ fn role_selection_message(
 
     Ok(CreateInteractionResponseMessage::new()
         .components(vec![serenity::CreateActionRow::SelectMenu(
-            serenity::CreateSelectMenu::new("roles", serenity::CreateSelectMenuKind::String { options })
+            serenity::CreateSelectMenu::new("~roles", serenity::CreateSelectMenuKind::String { options })
                 .min_values(0)
                 .max_values(max_values),
         )])
