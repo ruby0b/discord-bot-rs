@@ -1,5 +1,6 @@
 use crate::{ConfigT, Currency, GamblingTable};
-use bot_core::{CmdContext, OptionExt as _, With};
+use bot_core::ext::option::OptionExt as _;
+use bot_core::{CmdContext, With};
 use eyre::Result;
 use uuid::Uuid;
 

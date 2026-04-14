@@ -1,5 +1,6 @@
 use crate::{ConfigT, Game};
-use bot_core::{OptionExt, State, With, safe_name};
+use bot_core::ext::option::OptionExt;
+use bot_core::{State, With, safe_name};
 use eyre::Result;
 use itertools::Itertools;
 use poise::serenity_prelude::{Builder as _, Context, EditRole, GuildId, Member, Permissions, RoleId, UserId};

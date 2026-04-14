@@ -1,6 +1,8 @@
 use crate::{ConfigT, LEAVE_SERVER_BUTTON_ID, StateT, worker_ask_update, worker_game_roles};
-use bot_core::set_ext::{BTreeSetExt, ToggleResult};
-use bot_core::{CreateReplyExt, EvtContext, OptionExt, State, With};
+use bot_core::ext::create_reply::CreateReplyExt;
+use bot_core::ext::option::OptionExt;
+use bot_core::ext::set::{BTreeSetExt, ToggleResult};
+use bot_core::{EvtContext, State, With};
 use eyre::{OptionExt as _, Result};
 use poise::CreateReply;
 use poise::serenity_prelude::{

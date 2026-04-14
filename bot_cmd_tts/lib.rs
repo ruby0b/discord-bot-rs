@@ -4,8 +4,10 @@
 mod tts;
 
 use bot_core::audio::{Playable, play};
+use bot_core::ext::option::OptionExt as _;
 use bot_core::serde::LiteralRegex;
-use bot_core::{EvtContext, OptionExt as _, State, VoiceChange, With, hash_store, template};
+use bot_core::voice_change::VoiceChange;
+use bot_core::{EvtContext, State, With, hash_store, template};
 use dashmap::DashMap;
 use eyre::{OptionExt as _, Result, bail};
 use itertools::Itertools;

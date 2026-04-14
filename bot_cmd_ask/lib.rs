@@ -20,7 +20,7 @@ use bot_core::serde::LiteralRegex;
 use bot_core::{State, With};
 use chrono::TimeDelta;
 use eyre::Result;
-use poise::serenity_prelude::{Context, GuildId, MessageId, RoleId, UserId};
+use poise::serenity_prelude::{Context, GuildId, MessageId, UserId};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::{OnceCell, mpsc};

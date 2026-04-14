@@ -1,9 +1,10 @@
 use crate::{ConfigT, Game, GameDefaults, StateT, worker_game_roles};
+use bot_core::ext::option::OptionExt;
 use bot_core::serde::LiteralRegex;
-use bot_core::{CmdContext, OptionExt, State, With};
+use bot_core::{CmdContext, State, With};
 use eyre::{Result, WrapErr as _};
 use fancy_regex::Regex;
-use poise::serenity_prelude::{Role, RoleId};
+use poise::serenity_prelude::Role;
 use url::Url;
 
 /// Edit game-specific /ask ping and defaults

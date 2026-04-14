@@ -1,4 +1,7 @@
-use bot_core::{EvtContext, LockSet, OptionExt as _, State, VoiceChange, With};
+use bot_core::ext::option::OptionExt as _;
+use bot_core::lock_set::LockSet;
+use bot_core::voice_change::VoiceChange;
+use bot_core::{EvtContext, State, With};
 use eyre::Result;
 use itertools::Itertools;
 use poise::serenity_prelude::all::{Builder, ChannelId, ChannelType, CreateChannel, GuildChannel, GuildId, VoiceState};

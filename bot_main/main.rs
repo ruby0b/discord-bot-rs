@@ -9,7 +9,7 @@ mod log;
 mod message_file;
 mod util;
 
-use bot_core::OptionExt as _;
+use bot_core::ext::option::OptionExt as _;
 use eyre::{Result, WrapErr as _};
 use poise::serenity_prelude::{ChannelId, Client, FullEvent, GatewayIntents, GuildId, Interaction, Settings};
 use songbird::SerenityInit as _;

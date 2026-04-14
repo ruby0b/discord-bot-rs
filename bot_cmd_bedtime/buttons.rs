@@ -1,6 +1,8 @@
 use crate::ConfigT;
+use bot_core::ext::create_reply::CreateReplyExt;
+use bot_core::ext::option::OptionExt as _;
 use bot_core::iso_weekday::IsoWeekday;
-use bot_core::{CreateReplyExt, EvtContext, OptionExt as _, With};
+use bot_core::{EvtContext, With};
 use chrono::{Utc, Weekday};
 use eyre::{OptionExt, Result, ensure};
 use poise::CreateReply;

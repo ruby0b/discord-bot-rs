@@ -1,5 +1,7 @@
 use crate::{ACCOUNT_BUTTON_ID, ConfigT, Currency, DailyIncome, TABLE_SELECT_ID};
-use bot_core::{CmdContext, CreateReplyExt, EvtContext, OptionExt as _, With, avatar_url};
+use bot_core::ext::create_reply::CreateReplyExt;
+use bot_core::ext::option::OptionExt as _;
+use bot_core::{CmdContext, EvtContext, With, avatar_url};
 use chrono::{DateTime, Datelike, Local, TimeZone};
 use eyre::{OptionExt, Result};
 use itertools::Itertools;

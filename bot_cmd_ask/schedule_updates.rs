@@ -1,6 +1,7 @@
 use crate::worker_ask_update::Command;
 use crate::{Ask, ConfigT, StateT};
-use bot_core::{OptionExt as _, State, With};
+use bot_core::ext::option::OptionExt as _;
+use bot_core::{State, With};
 use chrono::{TimeDelta, Utc};
 use eyre::{OptionExt as _, Result};
 use poise::serenity_prelude::MessageId;

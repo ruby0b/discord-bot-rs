@@ -1,5 +1,6 @@
 use bot_core::choice_parameters::ButtonStyleParameter;
-use bot_core::{CmdContext, EvtContext, OptionExt as _, UserData, With};
+use bot_core::ext::option::OptionExt as _;
+use bot_core::{CmdContext, EvtContext, UserData, With};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::all::{

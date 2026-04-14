@@ -1,5 +1,7 @@
+use bot_core::ext::option::OptionExt as _;
 use bot_core::serde::LiteralRegex;
-use bot_core::{CmdContext, EvtContext, OptionExt as _, State, VoiceChange, With};
+use bot_core::voice_change::VoiceChange;
+use bot_core::{CmdContext, EvtContext, State, With};
 use chrono::TimeDelta;
 use dashmap::{DashMap, Entry};
 use eyre::{OptionExt as _, Result};

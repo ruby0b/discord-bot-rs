@@ -1,6 +1,7 @@
 use crate::message_file::MessageFile;
 use crate::util::{code_block_or_file, diff};
-use bot_core::{CmdContext, OptionExt as _, State};
+use bot_core::ext::option::OptionExt as _;
+use bot_core::{CmdContext, State};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use poise::serenity_prelude::{
     Builder, Cache, CacheHttp, ChannelId, CreateAttachment, CreateAutocompleteResponse, CreateInputText,

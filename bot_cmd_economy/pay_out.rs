@@ -1,5 +1,7 @@
 use crate::{ConfigT, Currency, GamblingTable, StateT};
-use bot_core::{CreateReplyExt, EvtContext, OptionExt as _, State, With, deferred_message, to_snd};
+use bot_core::ext::create_reply::CreateReplyExt;
+use bot_core::ext::option::OptionExt as _;
+use bot_core::{EvtContext, State, With, deferred_message, to_snd};
 use eyre::{OptionExt, Result, ensure};
 use itertools::Itertools;
 use poise::CreateReply;

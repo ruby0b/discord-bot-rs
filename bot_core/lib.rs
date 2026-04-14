@@ -4,26 +4,28 @@ pub mod audio;
 pub mod autocomplete;
 pub mod choice_parameters;
 pub mod color_parameter;
+pub mod ext {
+    pub mod create_reply;
+    pub mod option;
+    pub mod result;
+    pub mod set;
+}
 pub mod hash_store;
 pub mod interval_set;
 pub mod iso_weekday;
-pub mod result_ext;
+pub mod lock_set;
 pub mod serde;
-pub mod set_ext;
 pub mod template;
 pub mod timer_queue;
+pub mod voice_change;
 
+use crate::ext::option::OptionExt as _;
 use chrono::{DateTime, Local, NaiveDateTime, NaiveTime, TimeZone as _, Utc};
-use dashmap::DashMap;
-use eyre::{OptionExt as _, Result};
-use poise::CreateReply;
+use eyre::Result;
 use poise::serenity_prelude::{
-    Builder as _, Cache, ChannelId, ComponentInteraction, Context, CreateInteractionResponse, GuildId, Member, Message,
-    ModalInteraction, UserId, VoiceState,
+    Builder as _, Cache, Context, CreateInteractionResponse, GuildId, Member, ModalInteraction, UserId,
 };
-use std::hash::Hash;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 
 pub type EvtContext<'a, D> = poise::FrameworkContext<'a, D, eyre::Error>;
 pub type CmdContext<'a, D> = poise::Context<'a, D, eyre::Error>;
@@ -59,46 +61,11 @@ where
 
 impl<T, Data> State<Data> for T where T: AsRef<Arc<Data>> + UserData {}
 
-pub trait OptionExt<T> {
-    /// Convert None to an error
-    fn some(self) -> Result<T>;
-    fn inspect_none(self, f: impl FnOnce()) -> Self;
-}
-
-impl<T> OptionExt<T> for Option<T> {
-    fn some(self) -> Result<T> {
-        self.ok_or_eyre("Expected Some but got None")
-    }
-
-    fn inspect_none(self, f: impl FnOnce()) -> Self {
-        match self {
-            Some(x) => Some(x),
-            None => {
-                f();
-                None
-            }
-        }
-    }
-}
-
-/// A user's voice state change in a guild regarding their current voice channel.
-#[derive(Debug, PartialEq, Eq)]
-pub enum VoiceChange {
-    Join { to: ChannelId },
-    Leave { from: ChannelId },
-    Move { from: ChannelId, to: ChannelId },
-    Stay,
-}
-
-impl VoiceChange {
-    pub fn new((old, new): (&Option<VoiceState>, &VoiceState)) -> VoiceChange {
-        let old_channel_id = old.as_ref().and_then(|old| old.channel_id);
-        match (old_channel_id, new.channel_id) {
-            (None, Some(to)) => VoiceChange::Join { to },
-            (Some(from), None) => VoiceChange::Leave { from },
-            (Some(from), Some(to)) if from != to => VoiceChange::Move { from, to },
-            (None, None) | (Some(_), Some(_)) => VoiceChange::Stay,
-        }
+/// Returns a function x -> (x, f(x))
+pub fn to_snd<K, V>(f: impl Fn(&K) -> V) -> impl Fn(K) -> (K, V) {
+    move |key: K| {
+        let value = f(&key);
+        (key, value)
     }
 }
 
@@ -118,53 +85,6 @@ pub fn safe_name(ctx: &impl AsRef<Cache>, user_id: UserId) -> String {
 pub fn get_member(ctx: &impl AsRef<Cache>, guild_id: GuildId, user_id: UserId) -> Option<Member> {
     let guild = ctx.as_ref().guild(guild_id).inspect_none(|| tracing::warn!("Guild not in cache: {guild_id}"))?;
     guild.members.get(&user_id).inspect_none(|| tracing::warn!("Member not found in cache: {guild_id}")).cloned()
-}
-
-// todo generalize ComponentInteraction and ModalInteraction
-#[async_trait::async_trait]
-pub trait CreateReplyExt {
-    async fn respond_to_interaction(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<()>;
-
-    async fn edit_interaction(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message>;
-
-    async fn edit_message(self, ctx: &Context, message: &Message) -> Result<Message>;
-}
-
-#[async_trait::async_trait]
-impl CreateReplyExt for CreateReply {
-    async fn respond_to_interaction(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<()> {
-        Ok(CreateInteractionResponse::Message(self.to_slash_initial_response(Default::default()))
-            .execute(ctx, (interaction.id, &interaction.token))
-            .await?)
-    }
-
-    async fn edit_interaction(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message> {
-        Ok(self.to_slash_initial_response_edit(Default::default()).execute(ctx, &interaction.token).await?)
-    }
-
-    async fn edit_message(self, ctx: &Context, message: &Message) -> Result<Message> {
-        Ok(self
-            .to_prefix_edit(Default::default())
-            .execute(ctx, (message.channel_id, message.id, Some(message.author.id)))
-            .await?)
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct LockSet<K: Eq + Hash>(DashMap<K, Arc<Mutex<()>>>);
-
-impl<K: Eq + Hash> LockSet<K> {
-    pub fn get(&self, key: K) -> Arc<Mutex<()>> {
-        self.0.entry(key).or_default().clone()
-    }
-}
-
-/// Returns a function x -> (x, f(x))
-pub fn to_snd<K, V>(f: impl Fn(&K) -> V) -> impl Fn(K) -> (K, V) {
-    move |key: K| {
-        let value = f(&key);
-        (key, value)
-    }
 }
 
 pub fn naive_time_to_next_datetime(naive_time: NaiveTime) -> Option<DateTime<Local>> {

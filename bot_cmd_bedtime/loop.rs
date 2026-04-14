@@ -1,6 +1,7 @@
 use crate::ConfigT;
+use bot_core::ext::option::OptionExt as _;
 use bot_core::interval_set::IntervalSet;
-use bot_core::{OptionExt as _, State, With, get_member};
+use bot_core::{State, With, get_member};
 use chrono::{DateTime, Utc};
 use eyre::Result;
 use itertools::Itertools;
