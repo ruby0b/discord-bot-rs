@@ -20,7 +20,7 @@ use bot_core::serde::LiteralRegex;
 use bot_core::{State, With};
 use chrono::TimeDelta;
 use eyre::Result;
-use poise::serenity_prelude::{Context, GuildId, MessageId, UserId};
+use poise::serenity_prelude::{Context, GuildId, MessageId, RoleId, UserId};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::{OnceCell, mpsc};
@@ -50,7 +50,7 @@ pub struct StateT {
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Game {
-    parent_role: String,
+    parent_role: RoleId,
     title_pattern: LiteralRegex,
     defaults: GameDefaults,
     opted_out_users: BTreeSet<UserId>,

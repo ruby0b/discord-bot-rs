@@ -4,7 +4,7 @@ use bot_core::serde::LiteralRegex;
 use bot_core::{CmdContext, State, With};
 use eyre::{Result, WrapErr as _};
 use fancy_regex::Regex;
-use poise::serenity_prelude::Role;
+use poise::serenity_prelude::RoleId;
 use url::Url;
 
 /// Edit game-specific /ask ping and defaults
@@ -14,7 +14,7 @@ pub async fn configure_ask_game<D: With<ConfigT> + State<StateT>>(
     #[description = "Game name (a role with this name will be created)"]
     #[autocomplete = crate::autocomplete::existing_game_name]
     name: String,
-    #[description = "Auto-assign the game role to everyone with this (category) role"] parent_role: Role,
+    #[description = "Auto-assign the game role to everyone with this (category) role"] parent_role: RoleId,
     #[description = "Regex to match the game title"] title_pattern: Option<String>,
     #[description = "(Default) Minimum number of players"] min_players: Option<u32>,
     #[description = "(Default) Maximum number of players"] max_players: Option<u32>,
@@ -30,7 +30,7 @@ pub async fn configure_ask_game<D: With<ConfigT> + State<StateT>>(
             cfg.games.insert(
                 name,
                 Game {
-                    parent_role: parent_role.name,
+                    parent_role,
                     title_pattern: LiteralRegex(title_pattern),
                     defaults: GameDefaults { min_players, max_players, url, description, thumbnail_url },
                     opted_out_users: Default::default(),

@@ -4,7 +4,7 @@ use bot_core::{State, With, safe_name};
 use eyre::Result;
 use itertools::Itertools;
 use poise::serenity_prelude::{Builder as _, Context, EditRole, GuildId, Member, Permissions, RoleId, UserId};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::time::Duration;
 use tokio::select;
@@ -44,6 +44,10 @@ async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> 
     let guild_id: GuildId = *data.state();
     let games = data.with_ok(|c| c.games.clone()).await?;
 
+    let role_ids: HashSet<RoleId> = {
+        let guild = ctx.cache.guild(guild_id).some()?;
+        guild.roles.keys().copied().collect()
+    };
     let roles_by_name: HashMap<String, RoleId> = {
         let guild = ctx.cache.guild(guild_id).some()?;
         guild.roles.iter().map(|(&id, role)| (role.name.clone(), id)).collect()
@@ -59,12 +63,16 @@ async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> 
         existing_game_roles.insert(name, game_role.id);
     }
 
+    let should_have_game_role = |member: &Member, game: &Game| -> bool {
+        role_ids.contains(&game.parent_role)
+            && member.roles.contains(&game.parent_role)
+            && !game.opted_out_users.contains(&member.user.id)
+    };
+
     // prioritize removing roles from users (opt-out) and use the remaining request budget for adding roles to users
     let role_remove_requests =
         build_role_requests(ctx, guild_id, &games, &existing_game_roles, |member, game, role_id| {
-            member.roles.contains(&role_id)
-                && (roles_by_name.get(&game.parent_role).is_none_or(|p| !member.roles.contains(p))
-                    || game.opted_out_users.contains(&member.user.id))
+            member.roles.contains(&role_id) && !should_have_game_role(member, game)
         })?;
     let requests_per_minute_left = ROLE_ADD_REMOVE_PER_MINUTE.saturating_sub(role_remove_requests.len());
     for (user_id, role_id, name) in role_remove_requests.into_iter().take(ROLE_ADD_REMOVE_PER_MINUTE) {
@@ -74,9 +82,7 @@ async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> 
 
     let role_add_requests =
         build_role_requests(ctx, guild_id, &games, &existing_game_roles, |member, game, role_id| {
-            !member.roles.contains(&role_id)
-                && (roles_by_name.get(&game.parent_role).is_some_and(|p| member.roles.contains(p))
-                    && !game.opted_out_users.contains(&member.user.id))
+            !member.roles.contains(&role_id) && should_have_game_role(member, game)
         })?;
     for (user_id, role_id, name) in role_add_requests.into_iter().take(requests_per_minute_left) {
         tracing::info!("Adding role {name} to member {}", safe_name(ctx, user_id));
@@ -98,7 +104,7 @@ fn build_create_role_requests(
         .filter(|(name, _)| !existing_game_roles.contains_key(name.as_str()))
         .map(|(name, game)| {
             let builder = EditRole::new().name(name.clone()).permissions(Permissions::empty());
-            let builder = match guild.role_by_name(&game.parent_role) {
+            let builder = match guild.roles.get(&game.parent_role) {
                 Some(parent_role) => builder
                     .colour(parent_role.colour)
                     .mentionable(parent_role.mentionable)
