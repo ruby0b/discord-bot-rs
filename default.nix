@@ -1,10 +1,10 @@
 {
   yae ? (builtins.fromJSON (builtins.readFile ./yae.json)),
   sources ? {
-    nixpkgs = builtins.fetchTarball { inherit (yae.nixpkgs) url sha256; };
-    nixpkgs-lib = builtins.fetchTarball { inherit (yae.nixpkgs-lib) url sha256; };
-    crane = builtins.fetchTarball { inherit (yae.crane) url sha256; };
-    fenix = builtins.fetchTarball { inherit (yae.fenix) url sha256; };
+    nixpkgs = fetchTarball { inherit (yae.nixpkgs) url sha256; };
+    nixpkgs-lib = fetchTarball { inherit (yae.nixpkgs-lib) url sha256; };
+    crane = fetchTarball { inherit (yae.crane) url sha256; };
+    fenix = fetchTarball { inherit (yae.fenix) url sha256; };
   },
   system ? builtins.currentSystem,
   pkgs ? import sources.nixpkgs { inherit system; },
@@ -23,5 +23,5 @@ in
     packages = [ packages.fenix.complete.toolchain ];
     env = { inherit (packages.discord-bot-rs) RUSTFLAGS; };
   };
-  nixosModules.default = import ./nix/nixos-module.nix makePackages;
+  nixosModules.default = import ./nix/nixos-module.nix { inherit makePackages; };
 }

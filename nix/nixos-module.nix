@@ -1,4 +1,7 @@
-makePackages:
+{
+  makePackages,
+  ...
+}:
 {
   lib,
   config,
