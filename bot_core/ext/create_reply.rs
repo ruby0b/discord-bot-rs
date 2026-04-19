@@ -8,9 +8,8 @@ use poise::serenity_prelude::{
 #[async_trait::async_trait]
 pub trait CreateReplyExt {
     async fn respond_to_interaction(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<()>;
-
-    async fn edit_interaction(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message>;
-
+    async fn edit_original_response(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<Message>;
+    async fn edit_original_modal_response(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message>;
     async fn edit_message(self, ctx: &Context, message: &Message) -> Result<Message>;
 }
 
@@ -22,8 +21,12 @@ impl CreateReplyExt for CreateReply {
             .await?)
     }
 
-    async fn edit_interaction(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message> {
-        Ok(self.to_slash_initial_response_edit(Default::default()).execute(ctx, &interaction.token).await?)
+    async fn edit_original_modal_response(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message> {
+        edit_interaction(self, ctx, &interaction.token).await
+    }
+
+    async fn edit_original_response(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<Message> {
+        edit_interaction(self, ctx, &interaction.token).await
     }
 
     async fn edit_message(self, ctx: &Context, message: &Message) -> Result<Message> {
@@ -32,4 +35,8 @@ impl CreateReplyExt for CreateReply {
             .execute(ctx, (message.channel_id, message.id, Some(message.author.id)))
             .await?)
     }
+}
+
+async fn edit_interaction(this: CreateReply, ctx: &Context, token: &str) -> Result<Message> {
+    Ok(this.to_slash_initial_response_edit(Default::default()).execute(ctx, token).await?)
 }

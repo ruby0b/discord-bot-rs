@@ -161,7 +161,7 @@ async fn payout_confirm(
             CreateButton::new(confirm_id).label("Confirm").style(ButtonStyle::Success),
             CreateButton::new(cancel_id).label("Cancel").style(ButtonStyle::Danger),
         ])])
-        .edit_interaction(ctx.serenity_context, interaction)
+        .edit_original_modal_response(ctx.serenity_context, interaction)
         .await?;
 
     let first_interaction = async {
