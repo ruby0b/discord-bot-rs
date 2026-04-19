@@ -1,5 +1,5 @@
 [package]
-name = "bot_cmd_roles"
+name = "bot_cmd_role_buttons"
 version.workspace = true
 edition.workspace = true
 
@@ -15,4 +15,3 @@ tracing.workspace = true
 
 [lints]
 workspace = true
-

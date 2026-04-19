@@ -50,7 +50,7 @@ async fn main() -> Result<()> {
             bot_cmd_eval::typst(),
             bot_cmd_message::message(),
             bot_cmd_periodic_region_change::periodic_region_change(),
-            bot_cmd_roles::role_button(),
+            bot_cmd_role_buttons::role_button(),
             bot_cmd_economy::account(),
             bot_cmd_economy::gamble(),
             bot_cmd_economy::leaderboard(),
@@ -110,8 +110,8 @@ async fn main() -> Result<()> {
                             bot_cmd_bedtime::SELECT_BEDTIME_ID => {
                                 bot_cmd_bedtime::select_bedtime(framework, component).await?;
                             }
-                            bot_cmd_roles::SHOW_ROLE_SELECTION_ID => {
-                                bot_cmd_roles::show_role_selection(framework, component).await?;
+                            bot_cmd_role_buttons::SHOW_ROLE_SELECTION_ID => {
+                                bot_cmd_role_buttons::show_role_selection(framework, component).await?;
                             }
                             bot_cmd_economy::ACCOUNT_BUTTON_ID => {
                                 bot_cmd_economy::account_button(framework, component).await?;

@@ -46,7 +46,7 @@ pub struct GuildConfigT {
     #[serde(default)]
     periodic_region_change: bot_cmd_periodic_region_change::ConfigT,
     #[serde(default)]
-    roles: bot_cmd_roles::ConfigT,
+    roles: bot_cmd_role_buttons::ConfigT,
     #[serde(default)]
     tts: bot_cmd_tts::ConfigT,
     #[serde(default)]

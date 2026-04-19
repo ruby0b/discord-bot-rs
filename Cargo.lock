@@ -323,6 +323,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bot_cmd_role_buttons"
+version = "0.1.0"
+dependencies = [
+ "bot_core",
+ "eyre",
+ "poise",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "bot_cmd_role_icon"
 version = "0.1.0"
 dependencies = [
@@ -332,17 +343,6 @@ dependencies = [
  "poise",
  "rand 0.10.0",
  "serde",
-]
-
-[[package]]
-name = "bot_cmd_roles"
-version = "0.1.0"
-dependencies = [
- "bot_core",
- "eyre",
- "poise",
- "serde",
- "tracing",
 ]
 
 [[package]]
@@ -398,8 +398,8 @@ dependencies = [
  "bot_cmd_eval",
  "bot_cmd_message",
  "bot_cmd_periodic_region_change",
+ "bot_cmd_role_buttons",
  "bot_cmd_role_icon",
- "bot_cmd_roles",
  "bot_cmd_tts",
  "bot_core",
  "color-eyre",
