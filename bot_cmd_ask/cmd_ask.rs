@@ -62,8 +62,8 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
             .embed(ask.embed())
             .allowed_mentions(CreateAllowedMentions::new().roles(ask.role_id))
             .components(vec![ask.action_row()]);
-        let relpy_handle = ctx.send(reply).await?;
-        relpy_handle.message().await?.id
+        let reply_handle = ctx.send(reply).await?;
+        reply_handle.message().await?.id
     };
 
     ctx.data().with_mut_ok(|cfg| cfg.asks.insert(msg_id, ask.clone())).await?;
