@@ -4,7 +4,7 @@ use crate::{ConfigT, StateT};
 use bot_core::{CmdContext, State, With, naive_time_to_next_datetime};
 use chrono::{NaiveTime, Utc};
 use eyre::Result;
-use poise::serenity_prelude::{CreateAllowedMentions, RoleId};
+use poise::serenity_prelude::{CreateAllowedMentions, Guild, GuildChannel, RoleId};
 use url::Url;
 
 /// Find players to play a game with you
@@ -36,7 +36,7 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
 
     let role_id = match role_from_game_name(&ctx, game_name.as_deref()) {
         Some(x) => Some(x),
-        None => role_from_category_name(&ctx).await,
+        None => role_from_channel_or_category_name(&ctx).await,
     };
 
     let defaults = game.map(|g| &g.defaults);
@@ -80,9 +80,20 @@ fn role_from_game_name(ctx: &CmdContext<'_, impl Send + Sync>, game: Option<&str
     Some(role.id)
 }
 
-async fn role_from_category_name(ctx: &CmdContext<'_, impl Send + Sync>) -> Option<RoleId> {
-    let guild_channel = ctx.guild_channel().await?;
-    let category_name = guild_channel.parent_id?.name(ctx).await.ok()?;
+async fn role_from_channel_or_category_name(ctx: &CmdContext<'_, impl Send + Sync>) -> Option<RoleId> {
+    let channel = ctx.guild_channel().await?;
     let guild = ctx.guild()?;
-    Some(guild.role_by_name(&category_name)?.id)
+    role_from_channel_name(&guild, &channel).or_else(|| role_from_category_name(&guild, &channel))
+}
+
+fn role_from_channel_name(guild: &Guild, channel: &GuildChannel) -> Option<RoleId> {
+    let channel_name = channel.name.to_lowercase().replace(['-', '_'], " ");
+    let role = guild.roles.values().find(|role| role.name.to_lowercase() == channel_name)?;
+    Some(role.id)
+}
+
+fn role_from_category_name(guild: &Guild, channel: &GuildChannel) -> Option<RoleId> {
+    let category = guild.channels.get(&channel.parent_id?)?;
+    let role = guild.role_by_name(&category.name)?;
+    Some(role.id)
 }
