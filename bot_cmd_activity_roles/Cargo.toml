@@ -1,0 +1,19 @@
+[package]
+name = "bot_cmd_activity_roles"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+bot_core.path = "../bot_core"
+chrono.workspace = true
+eyre.workspace = true
+poise.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

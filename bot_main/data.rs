@@ -51,6 +51,8 @@ pub struct GuildConfigT {
     tts: bot_cmd_tts::ConfigT,
     #[serde(default)]
     economy: bot_cmd_economy::ConfigT,
+    #[serde(default)]
+    activity_roles: bot_cmd_activity_roles::ConfigT,
 }
 
 #[async_trait::async_trait]

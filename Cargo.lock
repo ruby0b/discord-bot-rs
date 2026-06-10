@@ -209,6 +209,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bot_cmd_activity_roles"
+version = "0.1.0"
+dependencies = [
+ "bot_core",
+ "chrono",
+ "eyre",
+ "poise",
+ "serde",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "bot_cmd_ask"
 version = "0.1.0"
 dependencies = [
@@ -391,6 +404,7 @@ name = "bot_main"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bot_cmd_activity_roles",
  "bot_cmd_ask",
  "bot_cmd_bedtime",
  "bot_cmd_economy",

@@ -70,6 +70,7 @@ async fn main() -> Result<()> {
                         bot_cmd_tts::voice_update(framework, guild_id, (old, new)).await?;
                         bot_cmd_ephemeral_voice_channels::voice_update(framework, guild_id, (old, new)).await?;
                         bot_cmd_periodic_region_change::voice_update(framework, guild_id, (old, new)).await?;
+                        bot_cmd_activity_roles::voice_update(framework, guild_id, (old, new)).await?;
                     }
                     FullEvent::ChannelUpdate { old, new } => {
                         bot_cmd_ephemeral_voice_channels::channel_update(framework, old, new).await?;
@@ -79,6 +80,7 @@ async fn main() -> Result<()> {
                     }
                     FullEvent::Message { new_message } => {
                         bot_cmd_role_icon::message(framework, new_message).await?;
+                        bot_cmd_activity_roles::message(framework, new_message).await?;
                     }
                     FullEvent::InteractionCreate { interaction: Interaction::Component(component) } => {
                         let full_id = &component.data.custom_id;
@@ -160,6 +162,7 @@ async fn main() -> Result<()> {
                 bot_cmd_ask::setup(ctx.clone(), data.clone(), serpapi_token).await?;
                 bot_cmd_bedtime::setup(ctx.clone(), data.clone()).await?;
                 bot_cmd_periodic_region_change::setup(ctx.clone(), data.clone()).await?;
+                bot_cmd_activity_roles::setup(ctx.clone(), data.clone()).await?;
 
                 Ok(data)
             })

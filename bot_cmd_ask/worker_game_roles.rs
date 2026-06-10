@@ -1,9 +1,9 @@
 use crate::{ConfigT, Game};
 use bot_core::ext::option::OptionExt;
-use bot_core::{State, With, safe_name};
+use bot_core::roles::enforce_roles;
+use bot_core::{State, With};
 use eyre::Result;
-use itertools::Itertools;
-use poise::serenity_prelude::{Builder as _, Context, EditRole, GuildId, Member, Permissions, RoleId, UserId};
+use poise::serenity_prelude::{Builder as _, Context, EditRole, GuildId, Permissions, RoleId, UserId};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt::Debug;
 use std::time::Duration;
@@ -37,8 +37,8 @@ pub(crate) async fn work(ctx: Context, data: impl With<ConfigT> + State<GuildId>
     }
 }
 
-const ROLE_CREATIONS_PER_MINUTE: usize = 3;
-const ROLE_ADD_REMOVE_PER_MINUTE: usize = 20;
+const ROLE_CREATIONS_PER_MINUTE: u16 = 3;
+const ROLE_ADD_REMOVE_PER_MINUTE: u16 = 20;
 
 async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> Result<()> {
     let guild_id: GuildId = *data.state();
@@ -57,37 +57,30 @@ async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> 
 
     // only do a few role creations at a time to not send too many requests at once
     let create_role_requests = build_create_role_requests(ctx, guild_id, &games, &existing_game_roles)?;
-    for (name, create_role) in create_role_requests.into_iter().take(ROLE_CREATIONS_PER_MINUTE) {
+    for (name, create_role) in create_role_requests.into_iter().take(ROLE_CREATIONS_PER_MINUTE as usize) {
         tracing::info!("Creating game role {create_role:?}");
         let game_role = create_role.execute(ctx, (guild_id, None)).await?;
         existing_game_roles.insert(name, game_role.id);
     }
 
-    let should_have_game_role = |member: &Member, game: &Game| -> bool {
-        role_ids.contains(&game.parent_role)
-            && member.roles.contains(&game.parent_role)
-            && !game.opted_out_users.contains(&member.user.id)
-    };
-
-    // prioritize removing roles from users (opt-out) and use the remaining request budget for adding roles to users
-    let role_remove_requests =
-        build_role_requests(ctx, guild_id, &games, &existing_game_roles, |member, game, role_id| {
-            member.roles.contains(&role_id) && !should_have_game_role(member, game)
-        })?;
-    let requests_per_minute_left = ROLE_ADD_REMOVE_PER_MINUTE.saturating_sub(role_remove_requests.len());
-    for (user_id, role_id, name) in role_remove_requests.into_iter().take(ROLE_ADD_REMOVE_PER_MINUTE) {
-        tracing::info!("Removing role {name} from member {} due to opt-out", safe_name(ctx, user_id));
-        ctx.http.remove_member_role(guild_id, user_id, role_id, Some("Game role opt-out")).await?;
+    let mut enforced_roles: HashMap<RoleId, HashSet<UserId>> = HashMap::new();
+    {
+        let guild = ctx.cache.guild(guild_id).unwrap();
+        for (name, game) in &games {
+            let mut users = HashSet::new();
+            // insert users that should have the game role
+            for member in guild.members.values() {
+                if role_ids.contains(&game.parent_role)
+                    && member.roles.contains(&game.parent_role)
+                    && !game.opted_out_users.contains(&member.user.id)
+                {
+                    users.insert(member.user.id);
+                }
+            }
+            enforced_roles.insert(*existing_game_roles.get(name).unwrap(), users);
+        }
     }
-
-    let role_add_requests =
-        build_role_requests(ctx, guild_id, &games, &existing_game_roles, |member, game, role_id| {
-            !member.roles.contains(&role_id) && should_have_game_role(member, game)
-        })?;
-    for (user_id, role_id, name) in role_add_requests.into_iter().take(requests_per_minute_left) {
-        tracing::info!("Adding role {name} to member {}", safe_name(ctx, user_id));
-        ctx.http.add_member_role(guild_id, user_id, role_id, Some("Game role")).await?;
-    }
+    enforce_roles(ctx, guild_id, &enforced_roles, ROLE_ADD_REMOVE_PER_MINUTE).await?;
 
     Ok(())
 }
@@ -114,29 +107,4 @@ fn build_create_role_requests(
             (name.clone(), builder)
         })
         .collect())
-}
-
-fn build_role_requests(
-    ctx: &Context,
-    guild_id: GuildId,
-    games: &BTreeMap<String, Game>,
-    game_roles: &BTreeMap<String, RoleId>,
-    mut filter: impl FnMut(&Member, &Game, RoleId) -> bool,
-) -> Result<Vec<(UserId, RoleId, String)>> {
-    let guild = ctx.cache.guild(guild_id).some()?;
-    game_roles
-        .iter()
-        .map(|(name, &role_id)| {
-            let game = games.get(name).some()?;
-            let requests = guild
-                .members
-                .values()
-                .filter(|member| filter(member, game, role_id))
-                .map(|member| member.user.id)
-                .map(|user_id| (user_id, role_id, name.clone()))
-                .collect_vec();
-            eyre::Ok(requests)
-        })
-        .flatten_ok()
-        .try_collect()
 }

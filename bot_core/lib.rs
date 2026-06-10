@@ -4,6 +4,7 @@ pub mod audio;
 pub mod autocomplete;
 pub mod choice_parameters;
 pub mod color_parameter;
+pub mod roles;
 pub mod ext {
     pub mod create_reply;
     pub mod option;
@@ -12,6 +13,7 @@ pub mod ext {
 }
 pub mod hash_store;
 pub mod interval_set;
+pub mod iso_week;
 pub mod iso_weekday;
 pub mod lock_set;
 pub mod serde;
