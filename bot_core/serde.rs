@@ -72,7 +72,19 @@ pub mod regex_str {
     where
         D: de::Deserializer<'de>,
     {
-        Regex::new(&<String as Deserialize>::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+        Regex::new(&String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
+    }
+}
+
+pub mod hex_bytes {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&hex::encode(bytes))
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+        hex::decode(&String::deserialize(deserializer)?).map_err(serde::de::Error::custom)
     }
 }
 

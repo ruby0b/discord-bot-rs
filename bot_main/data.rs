@@ -46,13 +46,13 @@ pub struct GuildConfigT {
     #[serde(default)]
     periodic_region_change: bot_cmd_periodic_region_change::ConfigT,
     #[serde(default)]
+    activity_roles: bot_cmd_activity_roles::ConfigT,
+    #[serde(default)]
     roles: bot_cmd_role_buttons::ConfigT,
     #[serde(default)]
     tts: bot_cmd_tts::ConfigT,
     #[serde(default)]
     economy: bot_cmd_economy::ConfigT,
-    #[serde(default)]
-    activity_roles: bot_cmd_activity_roles::ConfigT,
 }
 
 #[async_trait::async_trait]
