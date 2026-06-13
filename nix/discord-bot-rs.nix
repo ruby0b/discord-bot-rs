@@ -1,34 +1,34 @@
 {
-  craneFenix,
+  crane,
+  fenix,
   d2,
   imagemagick,
   lib,
   libopus,
+  makeWrapper,
   pkg-config,
   rstrict,
   typst,
-  makeWrapper,
 }:
 let
   main = "discord-bot-rs";
+  craneFenix = crane.overrideToolchain fenix.minimal.toolchain;
 in
 craneFenix.buildPackage {
   pname = main;
   src = lib.cleanSourceWith {
     src = ../.;
-    name = "source";
-    filter =
-      path: type: (builtins.match ".*src/.*" path != null) || (craneFenix.filterCargoSources path type);
+    filter = crane.filterCargoSources;
   };
+
   strictDeps = true;
   doCheck = false;
+
   nativeBuildInputs = [
     makeWrapper
     pkg-config
   ];
   buildInputs = [ libopus ];
-  # https://github.com/nix-community/fenix/issues/191
-  env.RUSTFLAGS = "-Clinker-features=-lld";
   postInstall = ''
     wrapProgram $out/bin/${main} --prefix PATH : ${
       lib.makeBinPath [
@@ -39,5 +39,7 @@ craneFenix.buildPackage {
       ]
     }
   '';
+
+  passthru.services.default = lib.modules.importApply ./service.nix { };
   meta.mainProgram = main;
 }

@@ -1,57 +1,53 @@
-{
-  makePackages,
-  ...
-}:
+{ }:
 {
   lib,
   config,
-  pkgs,
+  options,
   ...
 }:
 let
-  inherit (lib) mkOption types mkIf;
-  name = "discord-bot-rs";
-  home = "/var/lib/${name}";
-  cfg = config.services.${name};
+  inherit (lib) mkOption types;
+  inherit (config.package) pname;
 in
 {
-  options.services.${name} = {
-    enable = mkOption {
-      type = types.bool;
-      default = false;
-    };
-    package = lib.mkOption {
-      type = lib.types.package;
-      default = (makePackages pkgs).discord-bot-rs;
-    };
+  _class = "service";
+
+  options = {
     autostart = mkOption {
       type = types.bool;
       default = true;
     };
+    # XXX: can't use finalAttrs.finalPackage: https://github.com/ipetkov/crane/issues/963
+    package = lib.mkOption { type = lib.types.package; };
     token = mkOption { type = types.uniq types.str; };
     config_url = mkOption { type = types.uniq types.str; };
     serpapi_token = mkOption { type = types.uniq types.str; };
   };
 
-  config = mkIf cfg.enable {
-    systemd.services.${name} = {
-      description = name;
-      wantedBy = if cfg.autostart then [ "multi-user.target" ] else [ ];
+  config = {
+    process.argv = [
+      (lib.getExe config.package)
+      "--hide-window"
+      "--service-mode"
+    ];
+  }
+  // lib.optionalAttrs (options ? systemd) {
+    systemd.service = {
+      wantedBy = if config.autostart then [ "multi-user.target" ] else [ ];
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       environment = {
-        HOME = home;
-        BOT_TOKEN = cfg.token;
-        BOT_CONFIG_CHANNEL = cfg.config_url;
-        SERPAPI_TOKEN = cfg.serpapi_token;
+        HOME = "/var/lib/${pname}";
+        BOT_TOKEN = config.token;
+        BOT_CONFIG_CHANNEL = config.config_url;
+        SERPAPI_TOKEN = config.serpapi_token;
       };
       serviceConfig = {
-        ExecStart = "${pkgs.lib.getExe cfg.package}";
         Restart = "always";
         RestartSec = 30;
         DynamicUser = true;
-        StateDirectory = name;
-        WorkingDirectory = home;
+        StateDirectory = pname;
+        WorkingDirectory = "/var/lib/${pname}";
 
         # Hardening https://blog.sergeantbiggs.net/posts/hardening-applications-with-systemd/
         ## File System

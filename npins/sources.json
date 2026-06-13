@@ -1,0 +1,41 @@
+{
+  "pins": {
+    "crane": {
+      "type": "GitRelease",
+      "repository": {
+        "type": "GitHub",
+        "owner": "ipetkov",
+        "repo": "crane"
+      },
+      "pre_releases": false,
+      "version_upper_bound": null,
+      "release_prefix": null,
+      "submodules": false,
+      "version": "v0.23.4",
+      "revision": "498d7e7b9b708d584cbc71ec083527f68114f9a3",
+      "url": "https://api.github.com/repos/ipetkov/crane/tarball/refs/tags/v0.23.4",
+      "hash": "sha256-nnGD2f8OlAZT2i5OfwikJsw+ifWfiA4d6A8BWlgOXV0="
+    },
+    "fenix": {
+      "type": "Git",
+      "repository": {
+        "type": "GitHub",
+        "owner": "nix-community",
+        "repo": "fenix"
+      },
+      "branch": "monthly",
+      "submodules": false,
+      "revision": "8160d67d2693a1f7ea219db159ccdc29ae632918",
+      "url": "https://github.com/nix-community/fenix/archive/8160d67d2693a1f7ea219db159ccdc29ae632918.tar.gz",
+      "hash": "sha256-1y6LHeumqA2lnUZap2yor+g4jMFtno5mx119LEv+dQQ="
+    },
+    "nixpkgs": {
+      "type": "Channel",
+      "name": "nixos-26.05",
+      "artifact": "nixexprs.tar.xz",
+      "url": "https://releases.nixos.org/nixos/26.05/nixos-26.05.1947.a0374025a863/nixexprs.tar.xz",
+      "hash": "sha256-PoRRDfm1khYEJCk5KyX4Snud03VzRcmxKil5n6drTI0="
+    }
+  },
+  "version": 8
+}
