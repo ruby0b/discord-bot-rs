@@ -29,6 +29,7 @@ craneFenix.buildPackage {
     pkg-config
   ];
   buildInputs = [ libopus ];
+  env.RUSTFLAGS = "-Clinker-features=-lld";
   postInstall = ''
     wrapProgram $out/bin/${main} --prefix PATH : ${
       lib.makeBinPath [
