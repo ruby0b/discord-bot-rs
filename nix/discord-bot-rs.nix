@@ -13,6 +13,12 @@
 let
   main = "discord-bot-rs";
   craneFenix = crane.overrideToolchain fenix.minimal.toolchain;
+  runtime-dependencies = [
+    d2
+    imagemagick
+    typst
+    rstrict
+  ];
 in
 craneFenix.buildPackage {
   pname = main;
@@ -31,16 +37,12 @@ craneFenix.buildPackage {
   buildInputs = [ libopus ];
   env.RUSTFLAGS = "-Clinker-features=-lld";
   postInstall = ''
-    wrapProgram $out/bin/${main} --prefix PATH : ${
-      lib.makeBinPath [
-        d2
-        imagemagick
-        typst
-        rstrict
-      ]
-    }
+    wrapProgram $out/bin/${main} --prefix PATH : ${lib.makeBinPath runtime-dependencies}
   '';
 
-  passthru.services.default = lib.modules.importApply ./service.nix { };
+  passthru = {
+    inherit runtime-dependencies;
+    services.default = lib.modules.importApply ./service.nix { };
+  };
   meta.mainProgram = main;
 }

@@ -16,9 +16,10 @@ in
 {
   inherit packages;
   devShells.default = pkgs.mkShell {
-    # todo: doesn't do what I'd expect, e.g. imagemagick is not in path
     inputsFrom = [ packages.discord-bot-rs ];
-    packages = [ packages.fenix.complete.toolchain ];
+    packages = packages.discord-bot-rs.runtime-dependencies ++ [
+      packages.fenix.complete.toolchain
+    ];
     env = { inherit (packages.discord-bot-rs) RUSTFLAGS; };
   };
 }
