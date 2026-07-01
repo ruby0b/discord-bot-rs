@@ -11,7 +11,7 @@ use poise::serenity_prelude::{GuildId, UserId, VoiceState};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::Duration;
 use tokio::time::sleep;
-use tracing::warn;
+use tracing::{debug, error, trace, warn};
 
 const ROLE_ADD_REMOVE_PER_MINUTE: u16 = 10;
 
@@ -48,26 +48,26 @@ async fn set_user_as_active_today(ctx: EvtContext<'_, impl With<ConfigT>>, user_
 }
 
 pub async fn setup(ctx: Context, data: impl With<ConfigT> + State<GuildId>) -> Result<()> {
-    tracing::debug!("Spawning activity role worker");
+    debug!("Spawning activity role worker");
     {
         let ctx = ctx.clone();
         let data = data.clone();
         tokio::spawn(async move {
             loop {
-                tracing::trace!("Periodic role update");
+                trace!("Periodic role update");
                 if let Err(error) = update_roles(&ctx, &data).await {
-                    tracing::error!("Error in role worker: {error:?}");
+                    error!("Error in role worker: {error:?}");
                 }
                 sleep(Duration::from_secs(60)).await;
             }
         });
     }
-    tracing::debug!("Spawning activity log maintenance worker");
+    debug!("Spawning activity log maintenance worker");
     tokio::spawn(async move {
         loop {
-            tracing::trace!("Periodic log update");
+            trace!("Periodic log update");
             if let Err(error) = update_logs(&data).await {
-                tracing::error!("Error in log worker: {error:?}");
+                error!("Error in log worker: {error:?}");
             }
             sleep(Duration::from_secs(60)).await;
         }
