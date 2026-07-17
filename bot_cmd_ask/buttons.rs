@@ -1,14 +1,17 @@
+use crate::ask::{AskPlayer, AskPlayerState};
 use crate::{ConfigT, LEAVE_SERVER_BUTTON_ID, StateT, worker_ask_update, worker_game_roles};
 use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt;
 use bot_core::ext::set::{BTreeSetExt, ToggleResult};
 use bot_core::{EvtContext, State, With};
+use chrono::prelude::Utc;
 use eyre::{OptionExt as _, Result};
 use poise::CreateReply;
 use poise::serenity_prelude::{
     ButtonStyle, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateInputText,
     CreateInteractionResponse, CreateInteractionResponseMessage, CreateQuickModal, InputTextStyle,
 };
+use std::collections::btree_map;
 use std::time::Duration;
 
 pub enum AskButton {
@@ -23,37 +26,44 @@ pub async fn button_pressed(
     ask_button: AskButton,
 ) -> Result<()> {
     let player_id = component.user.id;
-
     let response = ctx
         .user_data
         .with_mut(|cfg| {
             let ask = cfg.asks.get_mut(&component.message.id).ok_or_eyre("unknown ask")?;
             Ok(match ask_button {
                 AskButton::Join => {
-                    ask.declined_players.retain(|&x| x != player_id);
-                    if !ask.full() && !ask.players.contains(&player_id) {
-                        ask.players.push(player_id);
+                    if ask.players.get(&player_id).is_none_or(|p| p.state != AskPlayerState::Joined) {
+                        ask.players.insert(
+                            player_id,
+                            AskPlayer {
+                                entered_at: Utc::now(), // todo make this settable via a different button
+                                state: AskPlayerState::Joined,
+                            },
+                        );
                     }
                     CreateInteractionResponse::Acknowledge
                 }
                 AskButton::Leave => {
-                    if !ask.players.contains(&player_id) && !ask.declined_players.contains(&player_id) {
+                    if !ask.players.contains_key(&player_id) {
                         leave_server_response()
                     } else {
-                        ask.players.retain(|&x| x != player_id);
-                        ask.declined_players.retain(|&x| x != player_id);
+                        ask.players.retain(|&x, _| x != player_id);
                         CreateInteractionResponse::Acknowledge
                     }
                 }
-                AskButton::Decline => {
-                    ask.players.retain(|&x| x != player_id);
-                    if ask.declined_players.contains(&player_id) {
-                        leave_server_response()
-                    } else {
-                        ask.declined_players.push(player_id);
+                AskButton::Decline => match ask.players.entry(player_id) {
+                    btree_map::Entry::Vacant(entry) => {
+                        entry.insert(AskPlayer { entered_at: Utc::now(), state: AskPlayerState::Declined });
                         CreateInteractionResponse::Acknowledge
                     }
-                }
+                    btree_map::Entry::Occupied(mut entry) => match entry.get().state {
+                        AskPlayerState::Declined => leave_server_response(),
+                        AskPlayerState::Joined => {
+                            entry.insert(AskPlayer { entered_at: Utc::now(), state: AskPlayerState::Declined });
+                            CreateInteractionResponse::Acknowledge
+                        }
+                    },
+                },
             })
         })
         .await?;

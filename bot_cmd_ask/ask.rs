@@ -1,15 +1,16 @@
 use crate::{DECLINE_BUTTON_ID, JOIN_BUTTON_ID, LEAVE_BUTTON_ID, TOGGLE_GAME_ROLE_BUTTON_ID};
 use chrono::{DateTime, TimeDelta, Utc};
+use itertools::Itertools;
 use poise::serenity_prelude::{
     ButtonStyle, ChannelId, Colour, CreateActionRow, CreateAllowedMentions, CreateButton, CreateEmbed, CreateMessage,
     EditMessage, Mentionable as _, MessageId, RoleId, UserId,
 };
+use std::collections::BTreeMap;
 use url::Url;
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Ask {
-    pub players: Vec<UserId>,
-    pub declined_players: Vec<UserId>,
+    pub players: BTreeMap<UserId, AskPlayer>,
     pub min_players: Option<u32>,
     pub max_players: Option<u32>,
     pub title: String,
@@ -22,6 +23,18 @@ pub(crate) struct Ask {
     #[serde(with = "chrono::serde::ts_seconds")]
     pub start_time: DateTime<Utc>,
     pub pinged: bool,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AskPlayer {
+    pub entered_at: DateTime<Utc>,
+    pub state: AskPlayerState,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum AskPlayerState {
+    Declined,
+    Joined,
 }
 
 impl Ask {
@@ -54,11 +67,18 @@ impl Ask {
             let unix = self.start_time.timestamp();
             ("Starts", format!("<t:{unix}:R>"), true)
         }));
-        let embed = embed.fields((!self.declined_players.is_empty()).then(|| {
-            let mentions = user_mentions(&self.declined_players);
-            ("Declined", format!("-# {mentions}"), false)
-        }));
-        let embed = embed.field(format!("Players: {}", self.players.len()), user_mentions(&self.players), false);
+        let embed = {
+            let declined = self.declined_players().collect_vec();
+            embed.fields((!declined.is_empty()).then(|| ("Declined", user_mentions(declined), false)))
+        };
+        let embed = {
+            let queued = self.queued_players().collect_vec();
+            embed.fields((!queued.is_empty()).then(|| ("In Queue", user_mentions(queued), false)))
+        };
+        let embed = {
+            let joined = self.joined_players().collect_vec();
+            embed.field(format!("Players: {}", joined.len()), user_mentions(joined), false)
+        };
         let embed = match &self.description {
             Some(description) => embed.description(description),
             None => embed,
@@ -74,8 +94,35 @@ impl Ask {
         embed
     }
 
+    fn declined_players(&self) -> impl Iterator<Item = UserId> {
+        self.players
+            .iter()
+            .filter(|(_, p)| p.state == AskPlayerState::Declined)
+            .sorted_by_key(|(_, p)| p.entered_at)
+            .map(|(id, _)| *id)
+    }
+
+    fn queued_players(&self) -> impl Iterator<Item = UserId> {
+        self.all_ready_players().skip(self.max_players.map_or(usize::MAX, |n| n as usize))
+    }
+
+    fn joined_players(&self) -> impl Iterator<Item = UserId> {
+        self.all_ready_players().take(self.max_players.map_or(usize::MAX, |n| n as usize))
+    }
+
+    fn all_ready_players(&self) -> impl Iterator<Item = UserId> {
+        self.players
+            .iter()
+            .filter_map(|(id, p)| match p.state {
+                AskPlayerState::Joined => Some((p.entered_at, id)),
+                _ => None,
+            })
+            .sorted() // sort by join time (and secondarily by id to ensure stability in case of ties)
+            .map(|(_, &id)| id)
+    }
+
     pub(crate) fn full(&self) -> bool {
-        self.max_players.is_some_and(|x| x as usize == self.players.len())
+        self.max_players.is_some_and(|x| x as usize == self.joined_players().count())
     }
 
     fn has_started(&self) -> bool {
@@ -85,7 +132,7 @@ impl Ask {
 
     pub(crate) fn action_row(&self) -> CreateActionRow {
         let mut buttons = vec![
-            CreateButton::new(JOIN_BUTTON_ID).style(ButtonStyle::Success).disabled(self.full()).label("Join"),
+            CreateButton::new(JOIN_BUTTON_ID).style(ButtonStyle::Success).label("Join"),
             CreateButton::new(DECLINE_BUTTON_ID).style(ButtonStyle::Danger).label("Decline"),
             CreateButton::new(LEAVE_BUTTON_ID).style(ButtonStyle::Secondary).label("Leave"),
         ];
@@ -96,16 +143,23 @@ impl Ask {
     }
 
     pub(crate) fn ping(&mut self, msg_id: MessageId) -> Option<CreateMessage> {
-        (!self.pinged && self.has_started() && self.players.len() >= self.min_players.unwrap_or(u32::MAX) as usize)
-            .then(|| {
-                self.pinged = true;
-                CreateMessage::new()
-                    .reference_message((self.channel_id, msg_id))
-                    .content(format!("**Lobby ready!**\n-# {}", user_mentions(&self.players)))
-            })
+        if self.pinged || !self.has_started() {
+            return None;
+        }
+        let ready_players = self.all_ready_players().collect_vec();
+        if ready_players.len() < self.min_players.unwrap_or(u32::MAX) as usize {
+            return None;
+        }
+
+        self.pinged = true;
+        Some(
+            CreateMessage::new()
+                .reference_message((self.channel_id, msg_id))
+                .content(format!("**Lobby ready!**\n-# {}", user_mentions(ready_players))),
+        )
     }
 }
 
-fn user_mentions(user_ids: &[UserId]) -> String {
-    user_ids.iter().map(|p| p.mention().to_string()).collect::<Vec<_>>().join(" ")
+fn user_mentions(user_ids: impl IntoIterator<Item = UserId>) -> String {
+    user_ids.into_iter().map(|p| p.mention().to_string()).collect::<Vec<_>>().join(" ")
 }

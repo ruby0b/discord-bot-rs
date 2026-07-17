@@ -1,4 +1,4 @@
-use crate::ask::Ask;
+use crate::ask::{Ask, AskPlayer, AskPlayerState};
 use crate::schedule_updates::schedule_ask_updates;
 use crate::{ConfigT, StateT};
 use bot_core::{CmdContext, State, With, naive_time_to_next_datetime};
@@ -39,10 +39,11 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
         None => role_from_channel_or_category_name(&ctx).await,
     };
 
+    let now = Utc::now();
+    let author_player = AskPlayer { state: AskPlayerState::Joined, entered_at: now };
     let defaults = game.map(|g| &g.defaults);
     let ask = Ask {
-        players: vec![ctx.author().id],
-        declined_players: vec![],
+        players: [(ctx.author().id, author_player)].into_iter().collect(),
         min_players: min_players.or(defaults.as_ref().and_then(|d| d.min_players)),
         max_players: max_players.or(defaults.as_ref().and_then(|d| d.max_players)),
         title,
@@ -52,7 +53,7 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
         channel_id: ctx.channel_id(),
         role_id,
         known_game: game_name,
-        start_time: start_time.and_then(naive_time_to_next_datetime).map_or_else(Utc::now, |dt| dt.to_utc()),
+        start_time: start_time.and_then(naive_time_to_next_datetime).map_or(now, |dt| dt.to_utc()),
         pinged: false,
     };
 
