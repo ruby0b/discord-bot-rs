@@ -1,5 +1,6 @@
 use crate::ConfigT;
 use bot_core::With;
+use bot_core::ext::option::OptionExt as _;
 use itertools::Itertools;
 use poise::serenity_prelude::{AutocompleteChoice, CreateAutocompleteResponse};
 
@@ -8,15 +9,20 @@ where
     U: With<ConfigT>,
 {
     async {
-        let matching_game_names = ctx
+        let choices = ctx
             .data()
-            .with_ok(|c| {
-                c.games.keys().filter(|name| name.to_lowercase().trim().starts_with(input)).cloned().collect_vec()
+            .with(|c| {
+                let guild = ctx.guild().some()?;
+                Ok(c.games
+                    .keys()
+                    .filter_map(|&role_id| guild.roles.get(&role_id).map(|r| r.name.clone()))
+                    .filter(|name| name.to_lowercase().trim().starts_with(input))
+                    .map(|name| AutocompleteChoice::new(name.clone(), name))
+                    .take(25)
+                    .collect_vec())
             })
             .await?;
-        eyre::Ok(CreateAutocompleteResponse::new().set_choices(
-            matching_game_names.into_iter().map(|name| AutocompleteChoice::new(name.clone(), name)).take(25).collect(),
-        ))
+        eyre::Ok(CreateAutocompleteResponse::new().set_choices(choices))
     }
     .await
     .inspect_err(|e| tracing::error!("Failed to auto-complete game names: {e:?}"))

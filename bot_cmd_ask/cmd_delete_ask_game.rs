@@ -1,10 +1,7 @@
 use crate::ConfigT;
+use bot_core::ext::option::OptionExt as _;
 use bot_core::{CmdContext, With};
-use eyre::Result;
-use itertools::Itertools;
-use poise::CreateReply;
-use poise::serenity_prelude::CreateAttachment;
-use std::collections::BTreeMap;
+use eyre::{OptionExt, Result};
 
 /// Delete game-specific /ask ping and defaults
 #[poise::command(slash_command, required_permissions = "MANAGE_GUILD", default_member_permissions = "MANAGE_GUILD")]
@@ -14,16 +11,19 @@ pub async fn delete_ask_game<D: With<ConfigT>>(
     #[autocomplete = crate::autocomplete::existing_game_name]
     name: String,
 ) -> Result<()> {
-    let deleted: BTreeMap<_, _> =
-        ctx.data().with_mut_ok(|cfg| cfg.games.extract_if(.., |game_name, _| *game_name == name).collect()).await?;
+    let role_id = {
+        let guild = ctx.guild().some()?;
+        crate::get_unique_role_by_name(&guild, name.trim())?.ok_or_eyre("No role with that name exists")?
+    };
 
-    if deleted.is_empty() {
-        ctx.say("❌ No game with that name was found").await?;
-    } else {
-        let attachment =
-            CreateAttachment::bytes(deleted.iter().map(|game| format!("{game:?}")).join("\n"), "deleted.txt");
-        let reply = CreateReply::new().content("🗑️ Ask defaults deleted").attachment(attachment);
-        ctx.send(reply).await?;
-    }
+    ctx.defer().await?;
+
+    let deleted_game = ctx.data().with_mut_ok(|cfg| cfg.games.remove(&role_id)).await?;
+    let deleted_game = deleted_game.ok_or_eyre("No game with that name was found")?;
+
+    ctx.guild_id().some()?.delete_role(ctx, role_id).await?;
+
+    ctx.say(format!("🗑️ Deleted game: {deleted_game:?}")).await?;
+
     Ok(())
 }

@@ -18,8 +18,7 @@ pub(crate) struct Ask {
     pub description: Option<String>,
     pub thumbnail_url: Option<String>,
     pub channel_id: ChannelId,
-    pub role_id: Option<RoleId>,
-    pub known_game: Option<String>,
+    pub role_id: AskRoleId,
     #[serde(with = "chrono::serde::ts_seconds")]
     pub start_time: DateTime<Utc>,
     pub pinged: bool,
@@ -37,16 +36,33 @@ pub(crate) enum AskPlayerState {
     Joined,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum AskRoleId {
+    KnownGame(RoleId),
+    Other(RoleId),
+    None,
+}
+
+impl AskRoleId {
+    pub(crate) fn into_option(self) -> Option<RoleId> {
+        match self {
+            AskRoleId::KnownGame(id) => Some(id),
+            AskRoleId::Other(id) => Some(id),
+            AskRoleId::None => None,
+        }
+    }
+}
+
 impl Ask {
     pub(crate) fn edit_message(&self) -> EditMessage {
         EditMessage::new()
             .content(self.content())
             .embed(self.embed())
-            .allowed_mentions(CreateAllowedMentions::new().roles(self.role_id))
+            .allowed_mentions(CreateAllowedMentions::new().roles(self.role_id.into_option()))
     }
 
     pub(crate) fn content(&self) -> String {
-        self.role_id.map(|r| r.mention().to_string()).unwrap_or_default()
+        self.role_id.into_option().map(|r| r.mention().to_string()).unwrap_or_default()
     }
 
     pub(crate) fn embed(&self) -> CreateEmbed {
@@ -136,7 +152,7 @@ impl Ask {
             CreateButton::new(DECLINE_BUTTON_ID).style(ButtonStyle::Danger).label("Decline"),
             CreateButton::new(LEAVE_BUTTON_ID).style(ButtonStyle::Secondary).label("Leave"),
         ];
-        if self.known_game.is_some() {
+        if let AskRoleId::KnownGame(_) = self.role_id {
             buttons.push(CreateButton::new(TOGGLE_GAME_ROLE_BUTTON_ID).style(ButtonStyle::Secondary).emoji('🔔'));
         }
         CreateActionRow::Buttons(buttons)

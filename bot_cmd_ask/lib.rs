@@ -19,8 +19,9 @@ use crate::schedule_updates::schedule_ask_updates;
 use bot_core::serde::LiteralRegex;
 use bot_core::{State, With};
 use chrono::TimeDelta;
-use eyre::Result;
-use poise::serenity_prelude::{Context, GuildId, MessageId, RoleId, UserId};
+use eyre::{Result, bail};
+use itertools::Itertools as _;
+use poise::serenity_prelude::{Context, Guild, GuildId, MessageId, RoleId, UserId};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::{OnceCell, mpsc};
@@ -37,7 +38,7 @@ pub struct ConfigT {
     #[serde(with = "bot_core::serde::td_seconds")]
     #[default(TimeDelta::hours(3))]
     expiration: TimeDelta,
-    games: BTreeMap<String, Game>,
+    games: BTreeMap<RoleId, Game>,
     asks: BTreeMap<MessageId, Ask>,
 }
 
@@ -94,4 +95,12 @@ pub async fn setup(
         }
     }
     Ok(())
+}
+
+pub(crate) fn get_unique_role_by_name(guild: &Guild, name: &str) -> Result<Option<RoleId>> {
+    let role_ids = guild.roles.iter().filter(|(_, r)| r.name == name).map(|(&id, _)| id).collect_vec();
+    if role_ids.len() > 1 {
+        bail!("Multiple roles with that name exist, please make sure that game role names are unique!")
+    }
+    Ok(role_ids.first().copied())
 }

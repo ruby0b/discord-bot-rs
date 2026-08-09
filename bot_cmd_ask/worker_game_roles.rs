@@ -1,10 +1,10 @@
-use crate::{ConfigT, Game};
+use crate::ConfigT;
 use bot_core::ext::option::OptionExt;
 use bot_core::roles::enforce_roles;
 use bot_core::{State, With};
 use eyre::Result;
-use poise::serenity_prelude::{Builder as _, Context, EditRole, GuildId, Permissions, RoleId, UserId};
-use std::collections::{BTreeMap, HashMap, HashSet};
+use poise::serenity_prelude::{Context, GuildId, RoleId, UserId};
+use std::collections::{HashMap, HashSet};
 use std::fmt::Debug;
 use std::time::Duration;
 use tokio::select;
@@ -27,7 +27,7 @@ pub(crate) async fn work(ctx: Context, data: impl With<ConfigT> + State<GuildId>
                     }
                 }
             }
-            _ = sleep(Duration::from_secs(30)) => {
+            _ = sleep(Duration::from_secs(60)) => {
                 tracing::trace!("Periodic update");
                 update(&ctx, &data).await
             }
@@ -37,7 +37,6 @@ pub(crate) async fn work(ctx: Context, data: impl With<ConfigT> + State<GuildId>
     }
 }
 
-const ROLE_CREATIONS_PER_MINUTE: u16 = 3;
 const ROLE_ADD_REMOVE_PER_MINUTE: u16 = 20;
 
 async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> Result<()> {
@@ -48,27 +47,18 @@ async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> 
         let guild = ctx.cache.guild(guild_id).some()?;
         guild.roles.keys().copied().collect()
     };
-    let roles_by_name: HashMap<String, RoleId> = {
-        let guild = ctx.cache.guild(guild_id).some()?;
-        guild.roles.iter().map(|(&id, role)| (role.name.clone(), id)).collect()
-    };
-    let mut existing_game_roles: BTreeMap<String, RoleId> =
-        games.keys().filter_map(|name| roles_by_name.get(name).map(|&id| (name.clone(), id))).collect();
-
-    // only do a few role creations at a time to not send too many requests at once
-    let create_role_requests = build_create_role_requests(ctx, guild_id, &games, &existing_game_roles)?;
-    for (name, create_role) in create_role_requests.into_iter().take(ROLE_CREATIONS_PER_MINUTE as usize) {
-        tracing::info!("Creating game role {create_role:?}");
-        let game_role = create_role.execute(ctx, (guild_id, None)).await?;
-        existing_game_roles.insert(name, game_role.id);
-    }
 
     let mut enforced_roles: HashMap<RoleId, HashSet<UserId>> = HashMap::new();
     {
         let guild = ctx.cache.guild(guild_id).unwrap();
-        for (name, game) in &games {
-            let mut users = HashSet::new();
+        for (&role_id, game) in &games {
+            if !role_ids.contains(&role_id) {
+                tracing::warn!("Game role {role_id} does not exist");
+                continue;
+            }
+
             // insert users that should have the game role
+            let mut users = HashSet::new();
             for member in guild.members.values() {
                 if role_ids.contains(&game.parent_role)
                     && member.roles.contains(&game.parent_role)
@@ -77,34 +67,12 @@ async fn update(ctx: &Context, data: &(impl With<ConfigT> + State<GuildId>)) -> 
                     users.insert(member.user.id);
                 }
             }
-            enforced_roles.insert(*existing_game_roles.get(name).unwrap(), users);
+
+            enforced_roles.insert(role_id, users);
         }
     }
+
     enforce_roles(ctx, guild_id, &enforced_roles, ROLE_ADD_REMOVE_PER_MINUTE).await?;
 
     Ok(())
-}
-
-fn build_create_role_requests(
-    ctx: &Context,
-    guild_id: GuildId,
-    games: &BTreeMap<String, Game>,
-    existing_game_roles: &BTreeMap<String, RoleId>,
-) -> Result<Vec<(String, EditRole<'static>)>> {
-    let guild = ctx.cache.guild(guild_id).some()?;
-    Ok(games
-        .iter()
-        .filter(|(name, _)| !existing_game_roles.contains_key(name.as_str()))
-        .map(|(name, game)| {
-            let builder = EditRole::new().name(name.clone()).permissions(Permissions::empty());
-            let builder = match guild.roles.get(&game.parent_role) {
-                Some(parent_role) => builder
-                    .colour(parent_role.colour)
-                    .mentionable(parent_role.mentionable)
-                    .audit_log_reason("Created game role from parent role"),
-                None => builder.audit_log_reason("Created game role (could not find parent role so no defaults!)"),
-            };
-            (name.clone(), builder)
-        })
-        .collect())
 }

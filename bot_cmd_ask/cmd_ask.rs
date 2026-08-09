@@ -1,6 +1,7 @@
-use crate::ask::{Ask, AskPlayer, AskPlayerState};
+use crate::ask::{Ask, AskPlayer, AskPlayerState, AskRoleId};
 use crate::schedule_updates::schedule_ask_updates;
 use crate::{ConfigT, StateT};
+use bot_core::ext::option::OptionExt as _;
 use bot_core::{CmdContext, State, With, naive_time_to_next_datetime};
 use chrono::{NaiveTime, Utc};
 use eyre::Result;
@@ -27,21 +28,30 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
                 .games
                 .iter()
                 .find(|(_, game)| game.title_pattern.0.is_match(&title).is_ok_and(|m| m))
-                .map(|(name, game)| (name.clone(), game.clone()));
+                .map(|(&role_id, game)| (role_id, game.clone()));
             Ok((game, cfg.expiration))
         })
         .await?;
-    let game_name = game_with_name.as_ref().map(|(name, _)| name.clone());
-    let game = game_with_name.as_ref().map(|(_, game)| game);
+    let game_role_id = game_with_name.as_ref().map(|(role_id, _)| *role_id);
+    let game = game_with_name.map(|(_, game)| game);
 
-    let role_id = match role_from_game_name(&ctx, game_name.as_deref()) {
-        Some(x) => Some(x),
-        None => role_from_channel_or_category_name(&ctx).await,
+    let existing_game_role_id = {
+        let guild = ctx.guild().some()?;
+        if game_role_id.is_some_and(|id| guild.roles.contains_key(&id)) { game_role_id } else { None }
+    };
+
+    let role_id = if let Some(game_role_id) = existing_game_role_id {
+        AskRoleId::KnownGame(game_role_id)
+    } else {
+        match role_from_channel_or_category_name(&ctx).await {
+            Some(role_id) => AskRoleId::Other(role_id),
+            None => AskRoleId::None,
+        }
     };
 
     let now = Utc::now();
     let author_player = AskPlayer { state: AskPlayerState::Joined, entered_at: now };
-    let defaults = game.map(|g| &g.defaults);
+    let defaults = game.map(|g| g.defaults);
     let ask = Ask {
         players: [(ctx.author().id, author_player)].into_iter().collect(),
         min_players: min_players.or(defaults.as_ref().and_then(|d| d.min_players)),
@@ -52,7 +62,6 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
         thumbnail_url: defaults.as_ref().and_then(|d| d.thumbnail_url.clone()),
         channel_id: ctx.channel_id(),
         role_id,
-        known_game: game_name,
         start_time: start_time.and_then(naive_time_to_next_datetime).map_or(now, |dt| dt.to_utc()),
         pinged: false,
     };
@@ -61,7 +70,7 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
         let reply = poise::CreateReply::default()
             .content(format!("{} {}", ask.title, ask.content()))
             .embed(ask.embed())
-            .allowed_mentions(CreateAllowedMentions::new().roles(ask.role_id))
+            .allowed_mentions(CreateAllowedMentions::new().roles(ask.role_id.into_option()))
             .components(vec![ask.action_row()]);
         let reply_handle = ctx.send(reply).await?;
         reply_handle.message().await?.id
@@ -72,13 +81,6 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
     schedule_ask_updates(ctx.data(), &ask, msg_id, expiration).await;
 
     Ok(())
-}
-
-fn role_from_game_name(ctx: &CmdContext<'_, impl Send + Sync>, game: Option<&str>) -> Option<RoleId> {
-    let guild = ctx.guild()?;
-    let game_name = game?;
-    let role = guild.role_by_name(game_name)?;
-    Some(role.id)
 }
 
 async fn role_from_channel_or_category_name(ctx: &CmdContext<'_, impl Send + Sync>) -> Option<RoleId> {

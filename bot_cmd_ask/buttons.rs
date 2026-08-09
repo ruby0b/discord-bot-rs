@@ -1,11 +1,11 @@
-use crate::ask::{AskPlayer, AskPlayerState};
+use crate::ask::{AskPlayer, AskPlayerState, AskRoleId};
 use crate::{ConfigT, LEAVE_SERVER_BUTTON_ID, StateT, worker_ask_update, worker_game_roles};
 use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt;
 use bot_core::ext::set::{BTreeSetExt, ToggleResult};
 use bot_core::{EvtContext, State, With};
 use chrono::prelude::Utc;
-use eyre::{OptionExt as _, Result};
+use eyre::{OptionExt as _, Result, bail};
 use poise::CreateReply;
 use poise::serenity_prelude::{
     ButtonStyle, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateInputText,
@@ -109,11 +109,13 @@ pub async fn toggle_game_role(
         .user_data
         .with_mut(|cfg| {
             let ask = cfg.asks.get(&component.message.id).ok_or_eyre("Unknown ask")?;
-            let game_name = ask.known_game.as_deref().ok_or_eyre("No game role is associated with this ask.")?;
-            let game = cfg.games.get_mut(game_name).ok_or_eyre("Unexpected: The game no longer exists.")?;
+            let AskRoleId::KnownGame(game_role_id) = ask.role_id else {
+                bail!("No game role is associated with this ask.")
+            };
+            let game = cfg.games.get_mut(&game_role_id).ok_or_eyre("Unexpected: The game no longer exists.")?;
             Ok(match game.opted_out_users.toggle(user_id) {
-                ToggleResult::Inserted => format!("🔕 Unsubscribed from {game_name}"),
-                ToggleResult::Removed => format!("🔔 Subscribed to {game_name}"),
+                ToggleResult::Inserted => format!("🔕 Unsubscribed from {game_role_id}"),
+                ToggleResult::Removed => format!("🔔 Subscribed to {game_role_id}"),
             })
         })
         .await?;
