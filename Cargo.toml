@@ -23,7 +23,6 @@ edition = "2024"
 [workspace.dependencies]
 async-trait = "0.1.88"
 chrono = { version = "0.4.40", features = ["serde"] }
-color-eyre = "0.6.5"
 dashmap = "6.1.0"
 derive_more = { version = "2.0.1", features = ["full"] }
 dotenvy = "0.15"
@@ -72,6 +71,3 @@ uuid = { version = "1.14.0", features = ["v4", "fast-rng", "serde"] }
 get_first = "allow"
 let_and_return = "allow"
 too_many_arguments = "allow"
-
-[profile.dev.package.backtrace]
-opt-level = 3
