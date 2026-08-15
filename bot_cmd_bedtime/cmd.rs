@@ -9,11 +9,13 @@ use uuid::Uuid;
 #[poise::command(slash_command, guild_only)]
 pub async fn bedtime<D: With<ConfigT>>(
     ctx: CmdContext<'_, D>,
-    #[description = "Time"]
+    #[string]
     #[autocomplete = bot_core::autocomplete::time]
+    #[description = "Time"]
     time: NaiveTime,
-    #[description = "Date"]
+    #[string]
     // todo autocomplete
+    #[description = "Date"]
     date: Option<NaiveDate>,
 ) -> Result<()> {
     let bedtime = Bedtime {

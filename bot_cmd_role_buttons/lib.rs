@@ -78,7 +78,9 @@ pub async fn insert<D: With<ConfigT>>(
     #[description = "Link to a message with a role button"] message_with_button: Message,
     #[description = "Role to add"] role: Role,
     #[description = "Description of the role"] description: String,
-    #[description = "Emoji to use for the role"] emoji: ReactionType,
+    #[string]
+    #[description = "Emoji to use for the role"]
+    emoji: ReactionType,
 ) -> Result<()> {
     let role_data = RoleData { role_id: role.id, description, emoji };
 

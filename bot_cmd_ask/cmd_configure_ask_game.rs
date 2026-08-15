@@ -19,7 +19,9 @@ pub async fn configure_ask_game<D: With<ConfigT> + State<StateT>>(
     #[description = "Regex to match the game title"] title_pattern: Option<String>,
     #[description = "(Default) Minimum number of players"] min_players: Option<u32>,
     #[description = "(Default) Maximum number of players"] max_players: Option<u32>,
-    #[description = "(Default) Link to the game"] url: Option<Url>,
+    #[string]
+    #[description = "(Default) Link to the game"]
+    url: Option<Url>,
     #[description = "(Default) Description of the game"] description: Option<String>,
     #[description = "(Default) Thumbnail of the game"] thumbnail_url: Option<String>,
 ) -> Result<()> {

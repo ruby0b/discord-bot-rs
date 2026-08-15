@@ -15,10 +15,13 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
     #[description = "Game title"] title: String,
     #[description = "Minimum number of players"] min_players: Option<u32>,
     #[description = "Maximum number of players"] max_players: Option<u32>,
-    #[description = "Start time"]
+    #[string]
     #[autocomplete = bot_core::autocomplete::time]
+    #[description = "Start time"]
     start_time: Option<NaiveTime>,
-    #[description = "Link to the game"] url: Option<Url>,
+    #[string]
+    #[description = "Link to the game"]
+    url: Option<Url>,
     #[description = "Game description"] description: Option<String>,
 ) -> Result<()> {
     let (game_with_name, expiration) = ctx

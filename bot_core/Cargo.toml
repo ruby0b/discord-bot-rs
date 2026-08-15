@@ -21,7 +21,6 @@ poise.workspace = true
 serde.workspace = true
 sha2.workspace = true
 songbird.workspace = true
-symphonia.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true

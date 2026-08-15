@@ -185,8 +185,7 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
     #[description = "Dot-separated config path"]
     #[autocomplete = autocomplete_config]
     path: String,
-    #[description = "Operation to perform (default is Edit)"] //
-    operation: Option<EditOperation>,
+    #[description = "Operation to perform (default is Edit)"] operation: Option<EditOperation>,
 ) -> Result<()> {
     let poise::Context::Application(app) = ctx else { return Ok(()) };
 
