@@ -15,7 +15,7 @@ struct RoleConfig {
     user_chances: BTreeMap<UserId, f64>,
 }
 
-pub async fn message<D: With<ConfigT>>(ctx: EvtContext<'_, D>, message: &Message) -> Result<()> {
+pub async fn on_message<D: With<ConfigT>>(ctx: EvtContext<'_, D>, message: &Message) -> Result<()> {
     if message.author.bot {
         return Ok(());
     }

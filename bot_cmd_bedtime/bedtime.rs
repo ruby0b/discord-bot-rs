@@ -1,6 +1,6 @@
 use crate::{ConfigT, DELETE_BUTTON_ID, SELECT_BEDTIME_ID, TOGGLE_WEEKDAY_BUTTON_ID};
 use bot_core::With;
-use bot_core::iso_weekday::IsoWeekday;
+use bot_core::time::iso_weekday::IsoWeekday;
 use chrono::{DateTime, Datelike, Days, Local, TimeDelta, TimeZone, Utc, Weekday};
 use eyre::Result;
 use itertools::Itertools as _;

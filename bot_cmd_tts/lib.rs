@@ -59,7 +59,7 @@ enum CooldownId {
 
 pub trait UserDataT = With<ConfigT> + State<StateT> + State<bot_core::audio::StateT>;
 
-pub async fn voice_update(
+pub async fn on_voice_update(
     ctx: EvtContext<'_, impl UserDataT>,
     guild_id: GuildId,
     (old, new): (&Option<VoiceState>, &VoiceState),
@@ -81,7 +81,7 @@ pub async fn voice_update(
     Ok(())
 }
 
-pub async fn presence_update(ctx: EvtContext<'_, impl UserDataT>, presence: &Presence) -> Result<()> {
+pub async fn on_presence_update(ctx: EvtContext<'_, impl UserDataT>, presence: &Presence) -> Result<()> {
     let guild_id = presence.guild_id.ok_or_eyre("No guild ID")?;
     let vc_id = {
         let guild = ctx.serenity_context.cache.guild(guild_id).some()?;

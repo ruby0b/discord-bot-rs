@@ -18,7 +18,7 @@ pub struct StateT {
     category_locks: LockSet<ChannelId>,
 }
 
-pub async fn voice_update(
+pub async fn on_voice_update(
     ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
     guild_id: GuildId,
     update: (&Option<VoiceState>, &VoiceState),
@@ -46,7 +46,7 @@ pub async fn voice_update(
     Ok(())
 }
 
-pub async fn channel_update(
+pub async fn on_channel_update(
     ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
     old: &Option<GuildChannel>,
     new: &GuildChannel,

@@ -27,19 +27,19 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
     Ok(())
 }
 
-pub async fn account_button(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
+pub async fn btn_account(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
     let (reply, components) = account_reply(ctx.user_data, component.member.as_ref().some()?, None).await?;
 
     reply
         .components(components)
         .ephemeral(component.channel.as_ref().is_some_and(|c| c.kind != ChannelType::Voice))
-        .respond_to_interaction(ctx.serenity_context, component)
+        .respond_to_component(ctx.serenity_context, component)
         .await?;
 
     Ok(())
 }
 
-pub async fn table_select(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
+pub async fn btn_table_select(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
     let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind else {
         return Ok(());
     };
@@ -49,7 +49,7 @@ pub async fn table_select(ctx: EvtContext<'_, impl With<ConfigT>>, component: &C
     let table =
         ctx.user_data.with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist")).await?;
 
-    table.reply(&cur, table_id).respond_to_interaction(ctx.serenity_context, component).await?;
+    table.reply(&cur, table_id).respond_to_component(ctx.serenity_context, component).await?;
 
     Ok(())
 }

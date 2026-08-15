@@ -13,12 +13,10 @@ pub mod ext {
 }
 pub mod hash_store;
 pub mod interval_set;
-pub mod iso_week;
-pub mod iso_weekday;
 pub mod lock_set;
 pub mod serde;
 pub mod template;
-pub mod timer_queue;
+pub mod time;
 pub mod voice_change;
 
 use crate::ext::option::OptionExt as _;

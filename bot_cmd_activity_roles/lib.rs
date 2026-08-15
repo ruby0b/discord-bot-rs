@@ -23,11 +23,11 @@ pub struct ConfigT {
     log: BTreeMap<UserId, Log>,
 }
 
-pub async fn message(ctx: EvtContext<'_, impl With<ConfigT>>, message: &Message) -> Result<()> {
+pub async fn on_message(ctx: EvtContext<'_, impl With<ConfigT>>, message: &Message) -> Result<()> {
     set_user_as_active_today(ctx, message.author.id).await
 }
 
-pub async fn voice_update(
+pub async fn on_voice_update(
     ctx: EvtContext<'_, impl With<ConfigT>>,
     _guild_id: GuildId,
     (_old, new): (&Option<VoiceState>, &VoiceState),

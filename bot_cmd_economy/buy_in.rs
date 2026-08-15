@@ -4,7 +4,7 @@ use eyre::{OptionExt, Result, ensure};
 use poise::serenity_prelude::{ComponentInteraction, UserId};
 use uuid::Uuid;
 
-pub async fn buyin_button_pressed(
+pub async fn btn_buyin(
     ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
     component: &ComponentInteraction,
     param: &str,

@@ -52,7 +52,7 @@ pub async fn periodic_region_change<D: With<ConfigT>>(
     Ok(())
 }
 
-pub async fn voice_update<D: With<ConfigT> + State<StateT>>(
+pub async fn on_voice_update<D: With<ConfigT> + State<StateT>>(
     ctx: EvtContext<'_, D>,
     guild_id: GuildId,
     (old, new): (&Option<VoiceState>, &VoiceState),

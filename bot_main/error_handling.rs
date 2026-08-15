@@ -1,6 +1,7 @@
+use bot_core::ext::create_reply::CreateReplyExt;
 use eyre::{Error, Report};
-use poise::serenity_prelude::{Colour, CreateEmbed, CreateInteractionResponse, FullEvent, Interaction};
-use poise::{CreateReply, FrameworkError};
+use poise::serenity_prelude::{Colour, CreateEmbed, FullEvent, Interaction};
+use poise::{ApplicationContext, Context, CreateReply, FrameworkError};
 
 pub async fn on_error<D>(error: FrameworkError<'_, D, Error>) {
     if let Err(e) = async {
@@ -12,32 +13,29 @@ pub async fn on_error<D>(error: FrameworkError<'_, D, Error>) {
                 let event_name = event.snake_case_name();
                 tracing::error!("Event handler error on {event_name}: {error:?}");
                 if let FullEvent::InteractionCreate { interaction: Interaction::Component(component) } = event {
-                    let reply = error_reply(format_report(error));
+                    let reply = error_reply(format_report(&error));
                     // XXX: There is no way for us to know if the interaction has already been responded to,
                     // so we try to create a response first, and if that fails, we send a followup instead.
                     // This is obviously terrible.
-                    if (component
-                        .create_response(
-                            framework.serenity_context,
-                            CreateInteractionResponse::Message(
-                                reply.clone().to_slash_initial_response(Default::default()),
-                            ),
-                        )
-                        .await)
-                        .is_err()
-                    {
-                        component
-                            .create_followup(
-                                framework.serenity_context,
-                                reply.to_slash_followup_response(Default::default()),
-                            )
-                            .await?;
+                    if reply.clone().respond_to_component(framework.serenity_context, component).await.is_err() {
+                        reply.followup_to_component(framework.serenity_context, component).await?;
                     }
                 }
             }
             FrameworkError::Command { error, ctx, .. } => {
                 tracing::error!("Error in /{}: {error:?}", ctx.command().name);
-                ctx.send(error_reply(format_report(error))).await?;
+                let reply = error_reply(format_report(&error));
+                let response = ctx.send(reply.clone()).await;
+                if response.is_err() {
+                    match ctx {
+                        Context::Application(ApplicationContext { interaction, .. }) => {
+                            reply.followup_to_command(ctx.serenity_context(), interaction).await?;
+                        }
+                        Context::Prefix(_) => {
+                            response?;
+                        }
+                    }
+                }
             }
             FrameworkError::ArgumentParse { ctx, input, error, .. } => {
                 tracing::warn!("Error parsing arguments: {error:?}");
@@ -64,7 +62,7 @@ fn error_reply(text: impl Into<String>) -> CreateReply {
     CreateReply::default().embed(embed).ephemeral(true)
 }
 
-fn format_report(err: Report) -> String {
+fn format_report(err: &Report) -> String {
     let err_str = format!("{err:#}");
     if err_str.contains('\n') { format!("```\n{err_str:#}\n```") } else { err_str }
 }

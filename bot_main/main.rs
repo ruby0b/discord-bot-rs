@@ -17,22 +17,31 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    crate::log::init_tracing();
-    unsafe { crate::log::init_eyre()? }
+    // read required config from environment variables (or .env file)
+    let config_url = dotenvy::var("BOT_CONFIG_CHANNEL").expect("BOT_CONFIG_CHANNEL not set");
+    let bot_token = dotenvy::var("BOT_TOKEN").expect("BOT_TOKEN not set");
+    let serpapi_token = dotenvy::var("SERPAPI_TOKEN").expect("SERPAPI_TOKEN not set");
+    // discard the environment variables to prevent accidental leaking of secrets to subprocesses
+    unsafe {
+        std::env::remove_var("BOT_CONFIG_CHANNEL");
+        std::env::remove_var("BOT_TOKEN");
+        std::env::remove_var("SERPAPI_TOKEN");
+    }
 
-    rustls::crypto::ring::default_provider().install_default().expect("Failed to install ring as rustls provider");
-
-    // Read required config from environment variables (or .env file)
-    let config_url = dotenvy::var("BOT_CONFIG_CHANNEL").wrap_err("BOT_CONFIG_CHANNEL not set")?;
-    let bot_token = dotenvy::var("BOT_TOKEN").wrap_err("BOT_TOKEN not set")?;
-    let serpapi_token = dotenvy::var("SERPAPI_TOKEN").wrap_err("SERPAPI_TOKEN not set")?;
-
+    // parse URL pointing to the discord channel with our pinned config message
     let (cfg_guild, cfg_channel): (GuildId, ChannelId) = (|| -> Result<_> {
         let url = url::Url::parse(&config_url)?;
         let mut segments = url.path_segments().some()?.skip(1);
         Ok((segments.next().some()?.parse()?, segments.next().some()?.parse()?))
     })()
     .wrap_err("Config URL must be a channel link")?;
+
+    // initialize logging / errors
+    crate::log::init_tracing();
+    crate::log::init_eyre();
+
+    // initialize TLS
+    rustls::crypto::ring::default_provider().install_default().expect("Failed to install ring as rustls provider");
 
     let options = poise::FrameworkOptions {
         commands: vec![
@@ -67,68 +76,72 @@ async fn main() -> Result<()> {
                 match event {
                     FullEvent::VoiceStateUpdate { old, new } => {
                         let Some(guild_id) = new.guild_id else { return Ok(()) };
-                        bot_cmd_tts::voice_update(framework, guild_id, (old, new)).await?;
-                        bot_cmd_ephemeral_voice_channels::voice_update(framework, guild_id, (old, new)).await?;
-                        bot_cmd_periodic_region_change::voice_update(framework, guild_id, (old, new)).await?;
-                        bot_cmd_activity_roles::voice_update(framework, guild_id, (old, new)).await?;
+                        bot_cmd_tts::on_voice_update(framework, guild_id, (old, new)).await?;
+                        bot_cmd_ephemeral_voice_channels::on_voice_update(framework, guild_id, (old, new)).await?;
+                        bot_cmd_periodic_region_change::on_voice_update(framework, guild_id, (old, new)).await?;
+                        bot_cmd_activity_roles::on_voice_update(framework, guild_id, (old, new)).await?;
                     }
                     FullEvent::ChannelUpdate { old, new } => {
-                        bot_cmd_ephemeral_voice_channels::channel_update(framework, old, new).await?;
+                        bot_cmd_ephemeral_voice_channels::on_channel_update(framework, old, new).await?;
                     }
                     FullEvent::PresenceUpdate { new_data } => {
-                        bot_cmd_tts::presence_update(framework, new_data).await?;
+                        bot_cmd_tts::on_presence_update(framework, new_data).await?;
                     }
                     FullEvent::Message { new_message } => {
-                        bot_cmd_role_icon::message(framework, new_message).await?;
-                        bot_cmd_activity_roles::message(framework, new_message).await?;
+                        bot_cmd_role_icon::on_message(framework, new_message).await?;
+                        bot_cmd_activity_roles::on_message(framework, new_message).await?;
                     }
                     FullEvent::InteractionCreate { interaction: Interaction::Component(component) } => {
                         let full_id = &component.data.custom_id;
                         let (id, param) = full_id.split_once(":").unwrap_or((full_id, ""));
                         match id {
                             bot_cmd_ask::JOIN_BUTTON_ID => {
-                                bot_cmd_ask::button_pressed(framework, component, bot_cmd_ask::AskButton::Join).await?;
+                                bot_cmd_ask::btn_join(framework, component).await?;
+                            }
+                            bot_cmd_ask::JOIN_ADVANCED_BUTTON_ID => {
+                                bot_cmd_ask::btn_join_advanced(framework, component).await?;
+                            }
+                            bot_cmd_ask::JOIN_ADVANCED_SUBMIT_BUTTON_ID => {
+                                bot_cmd_ask::btn_join_advanced_submit(framework, component, param).await?;
                             }
                             bot_cmd_ask::LEAVE_BUTTON_ID => {
-                                bot_cmd_ask::button_pressed(framework, component, bot_cmd_ask::AskButton::Leave)
-                                    .await?;
+                                bot_cmd_ask::btn_leave(framework, component).await?;
                             }
                             bot_cmd_ask::DECLINE_BUTTON_ID => {
-                                bot_cmd_ask::button_pressed(framework, component, bot_cmd_ask::AskButton::Decline)
-                                    .await?;
+                                bot_cmd_ask::btn_decline(framework, component).await?;
                             }
                             bot_cmd_ask::TOGGLE_GAME_ROLE_BUTTON_ID => {
-                                bot_cmd_ask::toggle_game_role(framework, component).await?;
+                                bot_cmd_ask::btn_toggle_game_role(framework, component).await?;
                             }
                             bot_cmd_ask::LEAVE_SERVER_BUTTON_ID => {
-                                bot_cmd_ask::leave_server(framework, component).await?;
+                                bot_cmd_ask::btn_leave_server(framework, component).await?;
                             }
                             bot_cmd_bedtime::TOGGLE_WEEKDAY_BUTTON_ID => {
-                                bot_cmd_bedtime::toggle_weekday_button(framework, component, param).await?;
+                                bot_cmd_bedtime::btn_toggle_weekday_button(framework, component, param).await?;
                             }
                             bot_cmd_bedtime::DELETE_BUTTON_ID => {
-                                bot_cmd_bedtime::delete_button(framework, component, param).await?;
+                                bot_cmd_bedtime::btn_delete(framework, component, param).await?;
                             }
                             bot_cmd_bedtime::SELECT_BEDTIME_ID => {
-                                bot_cmd_bedtime::select_bedtime(framework, component).await?;
+                                bot_cmd_bedtime::btn_select_bedtime(framework, component).await?;
                             }
                             bot_cmd_role_buttons::SHOW_ROLE_SELECTION_ID => {
-                                bot_cmd_role_buttons::show_role_selection(framework, component).await?;
+                                bot_cmd_role_buttons::btn_show_role_selection(framework, component).await?;
                             }
                             bot_cmd_economy::ACCOUNT_BUTTON_ID => {
-                                bot_cmd_economy::account_button(framework, component).await?;
+                                bot_cmd_economy::btn_account(framework, component).await?;
                             }
                             bot_cmd_economy::TABLE_SELECT_ID => {
-                                bot_cmd_economy::table_select(framework, component).await?;
+                                bot_cmd_economy::btn_table_select(framework, component).await?;
                             }
                             bot_cmd_economy::BUYIN_BUTTON_ID => {
-                                bot_cmd_economy::buyin_button_pressed(framework, component, param).await?;
+                                bot_cmd_economy::btn_buyin(framework, component, param).await?;
                             }
                             bot_cmd_economy::PAY_TABLE_BUTTON_ID => {
-                                bot_cmd_economy::pay_table_button_pressed(framework, component, param).await?;
+                                bot_cmd_economy::btn_pay_table(framework, component, param).await?;
                             }
                             bot_cmd_economy::PAY_PLAYER_BUTTON_ID => {
-                                bot_cmd_economy::pay_player_button_pressed(framework, component, param).await?;
+                                bot_cmd_economy::btn_pay_player(framework, component, param).await?;
                             }
                             unknown_id => {
                                 // convention: local interaction ids start with ~

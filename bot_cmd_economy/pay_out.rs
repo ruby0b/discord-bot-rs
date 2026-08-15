@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::time::Duration;
 use uuid::Uuid;
 
-pub async fn pay_player_button_pressed(
+pub async fn btn_pay_player(
     ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
     component: &ComponentInteraction,
     param: &str,
@@ -46,7 +46,7 @@ pub async fn pay_player_button_pressed(
     Ok(())
 }
 
-pub async fn pay_table_button_pressed(
+pub async fn btn_pay_table(
     ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
     component: &ComponentInteraction,
     param: &str,
@@ -161,7 +161,7 @@ async fn payout_confirm(
             CreateButton::new(confirm_id).label("Confirm").style(ButtonStyle::Success),
             CreateButton::new(cancel_id).label("Cancel").style(ButtonStyle::Danger),
         ])])
-        .edit_interaction(ctx.serenity_context, interaction)
+        .edit_initial_modal_response(ctx.serenity_context, interaction)
         .await?;
 
     let first_interaction = async {

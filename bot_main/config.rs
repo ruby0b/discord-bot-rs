@@ -1,16 +1,17 @@
 use crate::message_file::MessageFile;
 use crate::util::{code_block_or_file, diff};
+use bot_core::ext::create_reply::CreateReplyExt as _;
 use bot_core::ext::option::OptionExt as _;
 use bot_core::{CmdContext, State};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use poise::serenity_prelude::{
-    Builder, Cache, CacheHttp, ChannelId, CreateAttachment, CreateAutocompleteResponse, CreateInputText,
-    CreateInteractionResponse, CreateInteractionResponseFollowup, CreateQuickModal, GuildId, Http, InputTextStyle,
-    InteractionId, Message, ModalInteraction,
+    Cache, CacheHttp, ChannelId, CreateAttachment, CreateAutocompleteResponse, CreateInputText, CreateQuickModal,
+    GuildId, Http, InputTextStyle, InteractionId, Message, ModalInteraction,
 };
 use poise::{ChoiceParameter, CreateReply, serenity_prelude as serenity};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
+use std::iter;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{OnceCell, RwLock};
@@ -198,12 +199,7 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
         Some(EditOperation::Show) => {
             let (content, files) =
                 code_block_or_file(format!("Value of `{path}`:"), value_str, CONFIG_NAME, CONFIG_EXT);
-            // I hate this, why are the builder interfaces so inconsistent :(
-            let mut builder = CreateReply::new().content(content);
-            for f in files {
-                builder = builder.attachment(f);
-            }
-            ctx.send(builder).await?;
+            ctx.send(CreateReply::new().content(content).attachments(files)).await?;
             return Ok(());
         }
         Some(EditOperation::Append) => {
@@ -261,7 +257,7 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
     let diff = diff(&root_str, &new_root_str);
     let (content, files) = code_block_or_file(format!("✏️ Wrote `{path}`:"), diff, CONFIG_NAME, "diff");
 
-    CreateInteractionResponseFollowup::new().content(content).files(files).execute(ctx, (None, &int.token)).await?;
+    CreateReply::new().content(content).attachments(files).followup_to_modal(ctx.serenity_context(), &int).await?;
 
     Ok(())
 }
@@ -279,6 +275,8 @@ async fn edit_in_modal<D: State<GuildConfig<impl ConfigDataT>>>(
         return Ok(None);
     };
 
+    modal_response.interaction.defer_ephemeral(ctx).await?;
+
     ctx.data()
         .state()
         .with_mut(|cfg| {
@@ -290,8 +288,6 @@ async fn edit_in_modal<D: State<GuildConfig<impl ConfigDataT>>>(
             Ok(())
         })
         .await?;
-
-    modal_response.interaction.create_response(ctx, CreateInteractionResponse::Acknowledge).await?;
 
     Ok(Some(modal_response.interaction))
 }
@@ -322,11 +318,11 @@ pub async fn restore<D: State<GuildConfig<impl ConfigDataT>>>(ctx: CmdContext<'_
     let diff = diff(&old_str, &new_str);
     let (content, files) = code_block_or_file("✏️ Restored:".to_string(), diff, CONFIG_NAME, "diff");
 
-    let mut reply = CreateReply::new().content(content);
-    for f in files {
-        reply = reply.attachment(f);
-    }
-    reply = reply.attachment(CreateAttachment::bytes(old_str.as_bytes(), format!("old_{CONFIG_NAME}.{CONFIG_EXT}")));
+    let reply = CreateReply::new().content(content).attachments(
+        files
+            .into_iter()
+            .chain(iter::once(CreateAttachment::bytes(old_str.as_bytes(), format!("old_{CONFIG_NAME}.{CONFIG_EXT}")))),
+    );
     ctx.send(reply).await?;
 
     Ok(())

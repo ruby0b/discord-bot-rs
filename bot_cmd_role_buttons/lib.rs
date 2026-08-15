@@ -51,6 +51,8 @@ pub async fn new<D: With<ConfigT>>(
     #[description = "Button label"] button_label: Option<String>,
     #[description = "Button style"] button_style: Option<ButtonStyleParameter>,
 ) -> Result<()> {
+    ctx.defer().await?;
+
     ensure!(bot_message.author.id == ctx.framework().bot_id(), "That message wasn't sent by me");
     ctx.data()
         .with_mut_ok(|cfg| {
@@ -82,8 +84,9 @@ pub async fn insert<D: With<ConfigT>>(
     #[description = "Emoji to use for the role"]
     emoji: ReactionType,
 ) -> Result<()> {
-    let role_data = RoleData { role_id: role.id, description, emoji };
+    ctx.defer().await?;
 
+    let role_data = RoleData { role_id: role.id, description, emoji };
     ctx.data()
         .with_mut(|cfg| {
             let role_button = cfg.buttons.get_mut(&message_with_button.id).ok_or_eyre("Unknown role button")?;
@@ -110,6 +113,8 @@ pub async fn remove<D: With<ConfigT>>(
     #[description = "Link to a message with a role button"] message_with_button: Message,
     #[description = "Role to remove"] role: Role,
 ) -> Result<()> {
+    ctx.defer().await?;
+
     let role_data = ctx
         .data()
         .with_mut(|cfg| {
@@ -136,6 +141,8 @@ pub async fn on_click<D: With<ConfigT>>(
     #[description = "Link to a message with a role button"] message_with_button: Message,
     #[description = "Role to get on click"] role: Option<Role>,
 ) -> Result<()> {
+    ctx.defer().await?;
+
     let role = role.as_ref();
     let role_id = ctx
         .data()
@@ -150,7 +157,10 @@ pub async fn on_click<D: With<ConfigT>>(
     Ok(())
 }
 
-pub async fn show_role_selection(ctx: EvtContext<'_, impl With<ConfigT>>, int: &ComponentInteraction) -> Result<()> {
+pub async fn btn_show_role_selection(
+    ctx: EvtContext<'_, impl With<ConfigT>>,
+    int: &ComponentInteraction,
+) -> Result<()> {
     let button_message_id = int.message.id;
     let guild_id = int.guild_id.ok_or_eyre("No guild")?;
     let guild_roles = guild_id.to_guild_cached(ctx.serenity_context).some()?.roles.clone();

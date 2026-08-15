@@ -1,6 +1,7 @@
-use crate::{DECLINE_BUTTON_ID, JOIN_BUTTON_ID, LEAVE_BUTTON_ID, TOGGLE_GAME_ROLE_BUTTON_ID};
+use crate::{DECLINE_BUTTON_ID, JOIN_ADVANCED_BUTTON_ID, JOIN_BUTTON_ID, LEAVE_BUTTON_ID, TOGGLE_GAME_ROLE_BUTTON_ID};
+use bot_core::time::discord_timestamp;
 use chrono::{DateTime, TimeDelta, Utc};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use poise::serenity_prelude::{
     ButtonStyle, ChannelId, Colour, CreateActionRow, CreateAllowedMentions, CreateButton, CreateEmbed, CreateMessage,
     EditMessage, Mentionable as _, MessageId, RoleId, UserId,
@@ -79,22 +80,14 @@ impl Ask {
         });
         let embed = embed.field("Min Players", min, true);
         let embed = embed.field("Max Players", max, true);
-        let embed = embed.fields((!self.has_started()).then(|| {
-            let unix = self.start_time.timestamp();
-            ("Starts", format!("<t:{unix}:R>"), true)
-        }));
+        let embed = embed.fields((!self.has_started()).then(|| ("Starts", discord_timestamp(self.start_time), true)));
         let embed = {
             let declined = self.declined_players().collect_vec();
             embed.fields((!declined.is_empty()).then(|| ("Declined", user_mentions(declined), false)))
         };
-        let embed = {
-            let queued = self.queued_players().collect_vec();
-            embed.fields((!queued.is_empty()).then(|| ("In Queue", user_mentions(queued), false)))
-        };
-        let embed = {
-            let joined = self.joined_players().collect_vec();
-            embed.field(format!("Players: {}", joined.len()), user_mentions(joined), false)
-        };
+        let (joined, queued) = self.joined_players();
+        let embed = embed.fields((!queued.is_empty()).then(|| ("Queue", user_mentions_with_times(queued), false)));
+        let embed = embed.field(format!("Players: {}", joined.len()), user_mentions(joined), false);
         let embed = match &self.description {
             Some(description) => embed.description(description),
             None => embed,
@@ -118,27 +111,27 @@ impl Ask {
             .map(|(id, _)| *id)
     }
 
-    fn queued_players(&self) -> impl Iterator<Item = UserId> {
-        self.all_ready_players().skip(self.max_players.map_or(usize::MAX, |n| n as usize))
-    }
-
-    fn joined_players(&self) -> impl Iterator<Item = UserId> {
-        self.all_ready_players().take(self.max_players.map_or(usize::MAX, |n| n as usize))
-    }
-
-    fn all_ready_players(&self) -> impl Iterator<Item = UserId> {
+    fn joined_players(&self) -> (Vec<UserId>, Vec<(DateTime<Utc>, UserId)>) {
+        let now = Utc::now();
         self.players
             .iter()
             .filter_map(|(id, p)| match p.state {
-                AskPlayerState::Joined => Some((p.entered_at, id)),
+                AskPlayerState::Joined => Some((p.entered_at, *id)),
                 _ => None,
             })
-            .sorted() // sort by join time (and secondarily by id to ensure stability in case of ties)
-            .map(|(_, &id)| id)
+            .sorted()
+            .enumerate()
+            .partition_map(move |(i, (t, id))| {
+                if t <= now && i < self.max_players.map_or(usize::MAX, |n| n as usize) {
+                    Either::Left(id)
+                } else {
+                    Either::Right((t, id))
+                }
+            })
     }
 
     pub(crate) fn full(&self) -> bool {
-        self.max_players.is_some_and(|x| x as usize == self.joined_players().count())
+        self.max_players.is_some_and(|x| x as usize == self.joined_players().0.len())
     }
 
     fn has_started(&self) -> bool {
@@ -149,6 +142,7 @@ impl Ask {
     pub(crate) fn action_row(&self) -> CreateActionRow {
         let mut buttons = vec![
             CreateButton::new(JOIN_BUTTON_ID).style(ButtonStyle::Success).label("Join"),
+            CreateButton::new(JOIN_ADVANCED_BUTTON_ID).style(ButtonStyle::Success).label("Later…"),
             CreateButton::new(DECLINE_BUTTON_ID).style(ButtonStyle::Danger).label("Decline"),
             CreateButton::new(LEAVE_BUTTON_ID).style(ButtonStyle::Secondary).label("Leave"),
         ];
@@ -162,7 +156,7 @@ impl Ask {
         if self.pinged || !self.has_started() {
             return None;
         }
-        let ready_players = self.all_ready_players().collect_vec();
+        let ready_players = self.joined_players().0;
         if ready_players.len() < self.min_players.unwrap_or(u32::MAX) as usize {
             return None;
         }
@@ -177,5 +171,16 @@ impl Ask {
 }
 
 fn user_mentions(user_ids: impl IntoIterator<Item = UserId>) -> String {
-    user_ids.into_iter().map(|p| p.mention().to_string()).collect::<Vec<_>>().join(" ")
+    user_ids.into_iter().map(|u| u.mention()).join(" ")
+}
+
+fn user_mentions_with_times(users: impl IntoIterator<Item = (DateTime<Utc>, UserId)>) -> String {
+    let now = Utc::now();
+    users
+        .into_iter()
+        .map(|(t, u)| {
+            let optional_timestamp = if t > now { discord_timestamp(t) } else { "".to_string() };
+            format!("{}{}", u.mention(), optional_timestamp)
+        })
+        .join(" ")
 }

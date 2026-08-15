@@ -28,6 +28,8 @@ use tokio::sync::{OnceCell, mpsc};
 use url::Url;
 
 pub const JOIN_BUTTON_ID: &str = "ask.join_button";
+pub const JOIN_ADVANCED_BUTTON_ID: &str = "ask.join_advanced_button";
+pub const JOIN_ADVANCED_SUBMIT_BUTTON_ID: &str = "ask.join_advanced_submit_button";
 pub const LEAVE_BUTTON_ID: &str = "ask.leave_button";
 pub const DECLINE_BUTTON_ID: &str = "ask.decline_button";
 pub const LEAVE_SERVER_BUTTON_ID: &str = "ask.leave_server";

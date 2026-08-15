@@ -1,7 +1,7 @@
 use crate::ConfigT;
 use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt as _;
-use bot_core::iso_weekday::IsoWeekday;
+use bot_core::time::iso_weekday::IsoWeekday;
 use bot_core::{EvtContext, With};
 use chrono::{Utc, Weekday};
 use eyre::{OptionExt, Result, ensure};
@@ -9,7 +9,7 @@ use poise::CreateReply;
 use poise::serenity_prelude::{Color, ComponentInteraction, ComponentInteractionDataKind};
 use uuid::Uuid;
 
-pub async fn toggle_weekday_button(
+pub async fn btn_toggle_weekday_button(
     ctx: EvtContext<'_, impl With<ConfigT>>,
     component: &ComponentInteraction,
     param: &str,
@@ -38,7 +38,7 @@ pub async fn toggle_weekday_button(
     Ok(())
 }
 
-pub async fn delete_button(
+pub async fn btn_delete(
     ctx: EvtContext<'_, impl With<ConfigT>>,
     component: &ComponentInteraction,
     param: &str,
@@ -68,7 +68,10 @@ pub async fn delete_button(
     Ok(())
 }
 
-pub async fn select_bedtime(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
+pub async fn btn_select_bedtime(
+    ctx: EvtContext<'_, impl With<ConfigT>>,
+    component: &ComponentInteraction,
+) -> Result<()> {
     let ComponentInteractionDataKind::StringSelect { values } = &component.data.kind else {
         return Ok(());
     };
