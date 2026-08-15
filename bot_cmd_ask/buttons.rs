@@ -1,4 +1,5 @@
 use crate::ask::{AskPlayer, AskPlayerState, AskRoleId};
+use crate::schedule_updates::spawn_delayed_update;
 use crate::{
     ConfigT, JOIN_ADVANCED_SUBMIT_BUTTON_ID, LEAVE_SERVER_BUTTON_ID, StateT, worker_ask_update, worker_game_roles,
 };
@@ -6,6 +7,7 @@ use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt;
 use bot_core::ext::set::{BTreeSetExt, ToggleResult};
 use bot_core::{EvtContext, State, With};
+use chrono::TimeDelta;
 use chrono::prelude::{DateTime, Utc};
 use eyre::{Context, OptionExt as _, Result, bail};
 use poise::CreateReply;
@@ -87,6 +89,7 @@ pub async fn btn_join_advanced_submit(
     let origin = if ask_start_time > now { ask_start_time } else { now };
     let entered_at = origin + chrono::Duration::minutes(offset as i64);
     button_pressed(ctx, interaction, ask_id, AskEvent::Join(entered_at)).await?;
+    spawn_delayed_update(ctx.user_data, ask_id, (entered_at - Utc::now()).max(TimeDelta::zero()).to_std()?);
     Ok(())
 }
 

@@ -171,7 +171,7 @@ impl Ask {
 }
 
 fn user_mentions(user_ids: impl IntoIterator<Item = UserId>) -> String {
-    user_ids.into_iter().map(|u| u.mention()).join(" ")
+    user_ids.into_iter().map(|u| u.mention()).join(", ")
 }
 
 fn user_mentions_with_times(users: impl IntoIterator<Item = (DateTime<Utc>, UserId)>) -> String {
@@ -180,7 +180,7 @@ fn user_mentions_with_times(users: impl IntoIterator<Item = (DateTime<Utc>, User
         .into_iter()
         .map(|(t, u)| {
             let optional_timestamp = if t > now { discord_timestamp(t) } else { "".to_string() };
-            format!("{}{}", u.mention(), optional_timestamp)
+            format!("{} {}", u.mention(), optional_timestamp)
         })
-        .join(" ")
+        .join(", ")
 }

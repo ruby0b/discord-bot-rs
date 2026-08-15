@@ -13,10 +13,7 @@ pub(crate) async fn schedule_ask_updates(
     expiration: TimeDelta,
 ) {
     let start = ask.start_time.signed_duration_since(Utc::now()).to_std().unwrap_or_default();
-    spawn(data.clone(), async move |data| {
-        tokio::time::sleep(start).await;
-        send(&data, Command::Update(msg_id)).await
-    });
+    spawn_delayed_update(data, msg_id, start);
 
     let disable = (expiration + (ask.start_time - Utc::now())).to_std().unwrap_or_default();
     spawn(data.clone(), async move |data| {
@@ -52,6 +49,13 @@ where
             tracing::error!("Error in task: {e:?}");
         };
     })
+}
+
+pub(crate) fn spawn_delayed_update(data: &(impl With<ConfigT> + State<StateT>), msg_id: MessageId, start: std::time::Duration) {
+    spawn(data.clone(), async move |data| {
+        tokio::time::sleep(start).await;
+        send(&data, Command::Update(msg_id)).await
+    });
 }
 
 async fn send(data: &impl State<StateT>, cmd: Command) -> Result<()> {
