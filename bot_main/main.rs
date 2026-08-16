@@ -125,8 +125,11 @@ async fn main() -> Result<()> {
                             bot_cmd_bedtime::SELECT_BEDTIME_ID => {
                                 bot_cmd_bedtime::btn_select_bedtime(framework, component).await?;
                             }
-                            bot_cmd_role_buttons::SHOW_ROLE_SELECTION_ID => {
+                            bot_cmd_role_buttons::SHOW_ID => {
                                 bot_cmd_role_buttons::btn_show_role_selection(framework, component, param).await?;
+                            }
+                            bot_cmd_role_buttons::SELECT_ID => {
+                                bot_cmd_role_buttons::select_roles(framework, component, param).await?;
                             }
                             bot_cmd_economy::ACCOUNT_BUTTON_ID => {
                                 bot_cmd_economy::btn_account(framework, component).await?;
