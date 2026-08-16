@@ -6,9 +6,9 @@ use chrono::TimeDelta;
 use dashmap::{DashMap, Entry};
 use eyre::{OptionExt as _, Result};
 use itertools::Itertools;
-use poise::serenity_prelude::Guild;
-use poise::serenity_prelude::all::{Builder, ChannelId, ChannelType, EditChannel, GuildId, UserId, VoiceState};
-use poise::serenity_prelude::prelude::Context;
+use poise::serenity_prelude::{
+    Builder, ChannelId, ChannelType, Context, EditChannel, Guild, GuildId, UserId, VoiceState,
+};
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;

@@ -4,8 +4,9 @@ use bot_core::voice_change::VoiceChange;
 use bot_core::{EvtContext, State, With};
 use eyre::Result;
 use itertools::Itertools;
-use poise::serenity_prelude::all::{Builder, ChannelId, ChannelType, CreateChannel, GuildChannel, GuildId, VoiceState};
-use poise::serenity_prelude::{self as serenity, Context};
+use poise::serenity_prelude::{
+    Builder, ChannelId, ChannelType, Context, CreateChannel, EditChannel, GuildChannel, GuildId, VoiceState,
+};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct ConfigT {
@@ -79,7 +80,7 @@ pub async fn on_channel_update(
 
         if channel.kind == ChannelType::Voice {
             tracing::debug!("Assimilating channel to category: {} -> {}", channel.name, cat.name);
-            serenity::EditChannel::default()
+            EditChannel::default()
                 .permissions(cat.permission_overwrites)
                 .name(cat.name.clone())
                 .execute(ctx.serenity_context, channel.id)

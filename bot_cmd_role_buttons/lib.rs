@@ -2,11 +2,11 @@ use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt as _;
 use bot_core::{EvtContext, UserData, With};
 use eyre::{OptionExt as _, Result, WrapErr as _, bail, ensure};
-use poise::serenity_prelude::all::{
-    ComponentInteraction, ComponentInteractionDataKind, CreateActionRow, ReactionType, Role, RoleId,
+use poise::CreateReply;
+use poise::serenity_prelude::{
+    ComponentInteraction, ComponentInteractionDataKind, CreateActionRow, CreateSelectMenu, CreateSelectMenuKind,
+    CreateSelectMenuOption, ReactionType, Role, RoleId,
 };
-use poise::serenity_prelude::{CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption};
-use poise::{CreateReply, serenity_prelude as serenity};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 pub const SHOW_ID: &str = "role_buttons.show";
@@ -25,7 +25,7 @@ struct RoleButtonData {
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
 struct RoleData {
-    role_id: serenity::RoleId,
+    role_id: RoleId,
     description: String,
     #[serde(with = "bot_core::serde::emoji")]
     emoji: ReactionType,
@@ -72,6 +72,8 @@ pub async fn select_roles(
         bail!("Unexpected interaction kind: {:?}", interaction.data.kind);
     };
 
+    interaction.defer(ctx.serenity_context).await?;
+
     let role_button = read_role_button_data(ctx.user_data, role_set_id).await?;
     let selectable: HashSet<_> = role_button.roles.iter().map(|r| r.role_id).collect();
 
@@ -88,13 +90,6 @@ pub async fn select_roles(
     for &role_id in current.difference(&selected) {
         member.remove_role(ctx.serenity_context, role_id).await?;
     }
-
-    {
-        let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
-        role_selection_message(role_set_id, &guild.roles, &selected, role_button.roles)?
-    }
-    .respond_to_component(ctx.serenity_context, interaction)
-    .await?;
 
     Ok(())
 }

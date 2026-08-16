@@ -4,7 +4,7 @@ use crate::sandbox::run_in_sandbox;
 use bot_core::{CmdContext, UserData};
 use eyre::Result;
 use poise::CreateReply;
-use poise::serenity_prelude::all::CreateAttachment;
+use poise::serenity_prelude::CreateAttachment;
 
 /// Create a diagram using the d2 language
 #[poise::command(slash_command, guild_only)]

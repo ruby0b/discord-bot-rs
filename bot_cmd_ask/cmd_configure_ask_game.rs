@@ -4,8 +4,7 @@ use bot_core::serde::LiteralRegex;
 use bot_core::{CmdContext, State, With};
 use eyre::{OptionExt as _, Result, WrapErr as _};
 use fancy_regex::Regex;
-use poise::serenity_prelude::prelude::Mentionable;
-use poise::serenity_prelude::{EditRole, Permissions, RoleId};
+use poise::serenity_prelude::{EditRole, Mentionable, Permissions, RoleId};
 use url::Url;
 
 /// Edit game-specific /ask ping and defaults

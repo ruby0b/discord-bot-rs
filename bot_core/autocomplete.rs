@@ -1,6 +1,6 @@
 use chrono::Timelike;
 use itertools::Itertools as _;
-use poise::serenity_prelude::all::{AutocompleteChoice, CreateAutocompleteResponse};
+use poise::serenity_prelude::{AutocompleteChoice, CreateAutocompleteResponse};
 
 pub async fn voice_region<U, E>(ctx: poise::Context<'_, U, E>, _input: &str) -> CreateAutocompleteResponse {
     async {

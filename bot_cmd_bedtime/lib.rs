@@ -11,9 +11,7 @@ use bot_core::serde::LiteralRegex;
 use bot_core::{State, With};
 use chrono::TimeDelta;
 use eyre::Result;
-use poise::serenity_prelude::RoleId;
-use poise::serenity_prelude::all::GuildId;
-use poise::serenity_prelude::prelude::Context;
+use poise::serenity_prelude::{Context, GuildId, RoleId};
 use std::collections::BTreeMap;
 use uuid::Uuid;
 

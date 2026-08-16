@@ -1,4 +1,4 @@
-use poise::serenity_prelude::all::{ChannelId, GuildId, MessageId, parse_message_url};
+use poise::serenity_prelude::{ChannelId, GuildId, MessageId, parse_message_url};
 
 pub mod td_seconds {
     use chrono::TimeDelta;
@@ -39,7 +39,7 @@ pub mod duration_seconds {
 }
 
 pub mod emoji {
-    use poise::serenity_prelude::all::ReactionType;
+    use poise::serenity_prelude::ReactionType;
     use serde::{Deserialize, Serialize, de, ser};
 
     pub fn serialize<S>(value: &ReactionType, serializer: S) -> Result<S::Ok, S::Error>

@@ -5,10 +5,10 @@ use bot_core::ext::option::OptionExt as _;
 use bot_core::{CmdContext, State, deferred_message};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use poise::serenity_prelude::{
-    Cache, CacheHttp, ChannelId, CreateAttachment, CreateAutocompleteResponse, CreateInputText, CreateQuickModal,
-    GuildId, Http, InputTextStyle, InteractionId, Message, ModalInteraction,
+    Cache, CacheHttp, ChannelId, Context, CreateAttachment, CreateAutocompleteResponse, CreateInputText, CreateMessage,
+    CreateQuickModal, GuildId, Http, InputTextStyle, InteractionId, Message, ModalInteraction,
 };
-use poise::{ChoiceParameter, CreateReply, serenity_prelude as serenity};
+use poise::{ChoiceParameter, CreateReply};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::iter;
@@ -94,7 +94,7 @@ impl<DataT: ConfigDataT> GuildConfig<DataT> {
                 CONFIG_NAME,
                 "diff",
             );
-            let msg = serenity::CreateMessage::new()
+            let msg = CreateMessage::new()
                 .content(content)
                 .files(files)
                 .add_file(CreateAttachment::bytes(old_str.as_bytes(), format!("old_{}", file.filename)));
@@ -124,7 +124,7 @@ impl<DataT: ConfigDataT> GuildConfig<DataT> {
         f(&mut config.cache)
     }
 
-    pub async fn write_periodically(self: Arc<Self>, ctx: serenity::Context) {
+    pub async fn write_periodically(self: Arc<Self>, ctx: Context) {
         loop {
             tokio::time::sleep(Duration::from_secs(10)).await;
             if !self.is_initialized().await {
@@ -346,7 +346,7 @@ async fn autocomplete_config<U: State<GuildConfig<impl ConfigDataT>>, E>(
 
 mod autocomplete_yaml {
     use itertools::Itertools as _;
-    use poise::serenity_prelude::all::AutocompleteChoice;
+    use poise::serenity_prelude::AutocompleteChoice;
     use serde_yaml_ng::Value;
     use std::iter::once;
 
