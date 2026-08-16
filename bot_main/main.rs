@@ -113,6 +113,15 @@ async fn main() -> Result<()> {
                             bot_cmd_ask::TOGGLE_GAME_ROLE_BUTTON_ID => {
                                 bot_cmd_ask::btn_toggle_game_role(framework, component).await?;
                             }
+                            bot_cmd_ask::SHOW_PARENT_ROLE_BUTTONS_ID => {
+                                bot_cmd_ask::btn_show_parent_role_buttons(framework, component).await?;
+                            }
+                            bot_cmd_ask::SHOW_GAME_ROLES_SELECT_ID => {
+                                bot_cmd_ask::btn_show_game_role_selection(framework, component, param).await?;
+                            }
+                            bot_cmd_ask::SUBMIT_GAME_ROLES_SELECT_ID => {
+                                bot_cmd_ask::select_roles(framework, component, param).await?;
+                            }
                             bot_cmd_ask::LEAVE_SERVER_BUTTON_ID => {
                                 bot_cmd_ask::btn_leave_server(framework, component).await?;
                             }

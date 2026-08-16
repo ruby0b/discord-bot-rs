@@ -1,7 +1,8 @@
 use crate::ask::{AskPlayer, AskPlayerState, AskRoleId};
 use crate::schedule_updates::spawn_delayed_update;
 use crate::{
-    ConfigT, JOIN_ADVANCED_SUBMIT_BUTTON_ID, LEAVE_SERVER_BUTTON_ID, StateT, worker_ask_update, worker_game_roles,
+    ConfigT, Game, JOIN_ADVANCED_SUBMIT_BUTTON_ID, LEAVE_SERVER_BUTTON_ID, SHOW_GAME_ROLES_SELECT_ID,
+    SUBMIT_GAME_ROLES_SELECT_ID, StateT, worker_ask_update, worker_game_roles,
 };
 use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt;
@@ -9,13 +10,16 @@ use bot_core::ext::set::{BTreeSetExt, ToggleResult};
 use bot_core::{EvtContext, State, With};
 use chrono::TimeDelta;
 use chrono::prelude::{DateTime, Utc};
-use eyre::{Context, OptionExt as _, Result, bail};
+use eyre::{Context, OptionExt as _, Result, bail, ensure};
+use itertools::Itertools as _;
 use poise::CreateReply;
+use poise::serenity_prelude::prelude::Mentionable;
 use poise::serenity_prelude::{
-    ButtonStyle, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateInputText,
-    CreateQuickModal, InputTextStyle, MessageId,
+    ButtonStyle, Colour, ComponentInteraction, ComponentInteractionDataKind, CreateActionRow, CreateButton,
+    CreateEmbed, CreateInputText, CreateQuickModal, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption,
+    InputTextStyle, MessageId, RoleId,
 };
-use std::collections::btree_map;
+use std::collections::{BTreeMap, HashSet, btree_map};
 use std::time::Duration;
 
 pub enum AskEvent {
@@ -191,6 +195,129 @@ pub async fn btn_toggle_game_role(
         .await?;
 
     ctx.user_data.state().game_role_sender.get().some()?.send(worker_game_roles::Command::Update).await?;
+
+    Ok(())
+}
+
+pub async fn btn_show_parent_role_buttons(
+    ctx: EvtContext<'_, impl With<ConfigT>>,
+    interaction: &ComponentInteraction,
+) -> Result<()> {
+    let user_id = interaction.user.id;
+    let guild_id = interaction.guild_id.some()?;
+
+    let parent_roles: HashSet<RoleId> =
+        ctx.user_data.with_ok(|cfg| cfg.games.values().map(|game| game.parent_role).collect()).await?;
+    ensure!(!parent_roles.is_empty(), "There are no game roles");
+    ensure!(parent_roles.len() <= 25, "Discord can't display more than 25 options");
+
+    let components = {
+        let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
+        let member = guild.members.get(&user_id).ok_or_eyre("No member")?;
+        let member_roles: HashSet<RoleId> = member.roles.iter().copied().collect();
+        parent_roles
+            .into_iter()
+            .filter(|role_id| member_roles.contains(role_id))
+            .filter_map(|role_id| guild.roles.get(&role_id))
+            .sorted_by_key(|role| &role.name)
+            .map(|role| {
+                CreateButton::new(format!("{SHOW_GAME_ROLES_SELECT_ID}:{}", role.id))
+                    .label(role.name.clone())
+                    .style(ButtonStyle::Primary)
+            })
+            .chunks(5)
+            .into_iter()
+            .map(|row_buttons| CreateActionRow::Buttons(row_buttons.collect_vec()))
+            .collect_vec()
+    };
+
+    CreateReply::new()
+        .components(components)
+        .ephemeral(true)
+        .respond_to_component(ctx.serenity_context, interaction)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn btn_show_game_role_selection(
+    ctx: EvtContext<'_, impl With<ConfigT>>,
+    interaction: &ComponentInteraction,
+    param: &str,
+) -> Result<()> {
+    let parent_role = param.parse::<RoleId>()?;
+    let user_id = interaction.user.id;
+    let guild_id = interaction.guild_id.some()?;
+
+    let game_roles: BTreeMap<RoleId, Game> = ctx
+        .user_data
+        .with_ok(|cfg| {
+            cfg.games.iter().filter(|(_, game)| game.parent_role == parent_role).map(|(k, v)| (*k, v.clone())).collect()
+        })
+        .await?;
+    ensure!(!game_roles.is_empty(), "There are no game roles for {}", parent_role.mention());
+    ensure!(game_roles.len() <= 25, "Discord can't display more than 25 options");
+
+    let options = {
+        let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
+        game_roles
+            .into_iter()
+            .filter_map(|(role_id, game)| Some((guild.roles.get(&role_id)?, game)))
+            .map(|(role, game)| {
+                CreateSelectMenuOption::new(role.name.clone(), role.id.to_string())
+                    .default_selection(!game.opted_out_users.contains(&user_id))
+            })
+            .collect_vec()
+    };
+
+    let max_values = options.len() as u8;
+    CreateReply::new()
+        .components(vec![CreateActionRow::SelectMenu(
+            CreateSelectMenu::new(
+                format!("{SUBMIT_GAME_ROLES_SELECT_ID}:{parent_role}"),
+                CreateSelectMenuKind::String { options },
+            )
+            .min_values(0)
+            .max_values(max_values),
+        )])
+        .ephemeral(true)
+        .respond_to_component(ctx.serenity_context, interaction)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn select_roles(
+    ctx: EvtContext<'_, impl With<ConfigT>>,
+    interaction: &ComponentInteraction,
+    param: &str,
+) -> Result<()> {
+    let parent_role = param.parse::<RoleId>()?;
+    let user_id = interaction.user.id;
+    let ComponentInteractionDataKind::StringSelect { values } = interaction.data.kind.clone() else {
+        bail!("Unexpected interaction kind: {:?}", interaction.data.kind);
+    };
+    let selected: HashSet<RoleId> = values.into_iter().filter_map(|s| s.parse().ok()).collect();
+
+    interaction.defer(ctx.serenity_context).await?;
+
+    ctx.user_data
+        .with_mut_ok(|cfg| {
+            for (role_id, game) in &mut cfg.games {
+                if game.parent_role == parent_role {
+                    if selected.contains(role_id) {
+                        game.opted_out_users.remove(&user_id);
+                    } else {
+                        // This incorrectly also removes game roles
+                        // that were created after we sent the dropdown.
+                        // To fix that we'd have to parse the original dropdown
+                        // or store the unselected options somehow which would be annoying.
+                        game.opted_out_users.insert(user_id);
+                    }
+                }
+            }
+        })
+        .await?;
 
     Ok(())
 }

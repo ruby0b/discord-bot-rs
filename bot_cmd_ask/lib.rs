@@ -34,6 +34,9 @@ pub const LEAVE_BUTTON_ID: &str = "ask.leave_button";
 pub const DECLINE_BUTTON_ID: &str = "ask.decline_button";
 pub const LEAVE_SERVER_BUTTON_ID: &str = "ask.leave_server";
 pub const TOGGLE_GAME_ROLE_BUTTON_ID: &str = "ask.toggle_game_role";
+pub const SHOW_PARENT_ROLE_BUTTONS_ID: &str = "ask.show_parent_role_buttons";
+pub const SHOW_GAME_ROLES_SELECT_ID: &str = "ask.show_game_roles_select";
+pub const SUBMIT_GAME_ROLES_SELECT_ID: &str = "ask.submit_game_roles_select";
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
 pub struct ConfigT {

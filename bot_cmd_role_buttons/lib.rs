@@ -1,13 +1,14 @@
 use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt as _;
 use bot_core::{EvtContext, UserData, With};
-use eyre::{OptionExt as _, Result, WrapErr as _, bail, ensure};
+use eyre::{Context as _, OptionExt as _, Result, bail, ensure};
+use itertools::Itertools;
 use poise::CreateReply;
 use poise::serenity_prelude::{
     ComponentInteraction, ComponentInteractionDataKind, CreateActionRow, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption, ReactionType, Role, RoleId,
+    CreateSelectMenuOption, ReactionType, RoleId,
 };
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 pub const SHOW_ID: &str = "role_buttons.show";
 pub const SELECT_ID: &str = "role_buttons.select";
@@ -42,13 +43,33 @@ pub async fn btn_show_role_selection(
 
     let role_button = read_role_button_data(ctx.user_data, role_set_id).await?;
 
-    {
+    let options = {
         let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
         let member = guild.members.get(&user_id).ok_or_eyre("No member")?;
-        role_selection_message(role_set_id, &guild.roles, &member.roles.iter().collect(), role_button.roles)?
-    }
-    .respond_to_component(ctx.serenity_context, interaction)
-    .await?;
+        let member_roles: HashSet<RoleId> = member.roles.iter().copied().collect();
+        role_button
+            .roles
+            .into_iter()
+            .filter_map(|role_config| Some((guild.roles.get(&role_config.role_id)?, role_config)))
+            .map(|(role, role_config)| {
+                CreateSelectMenuOption::new(role.name.clone(), role_config.role_id.get().to_string())
+                    .description(role_config.description)
+                    .emoji(role_config.emoji)
+                    .default_selection(member_roles.contains(&role_config.role_id))
+            })
+            .collect_vec()
+    };
+
+    let max_values = options.len() as u8;
+    CreateReply::new()
+        .components(vec![CreateActionRow::SelectMenu(
+            CreateSelectMenu::new(format!("{SELECT_ID}:{role_set_id}"), CreateSelectMenuKind::String { options })
+                .min_values(0)
+                .max_values(max_values),
+        )])
+        .ephemeral(true)
+        .respond_to_component(ctx.serenity_context, interaction)
+        .await?;
 
     if let Some(on_click_role) = {
         let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
@@ -67,6 +88,7 @@ pub async fn select_roles(
     param: &str,
 ) -> Result<()> {
     let role_set_id = param;
+    let user_id = interaction.user.id;
     let guild_id = interaction.guild_id.some()?;
     let ComponentInteractionDataKind::StringSelect { values } = interaction.data.kind.clone() else {
         bail!("Unexpected interaction kind: {:?}", interaction.data.kind);
@@ -80,7 +102,8 @@ pub async fn select_roles(
     let selected: HashSet<_> = values.into_iter().filter_map(|s| s.parse().ok()).collect();
     let selected: HashSet<_> = selected.intersection(&selectable).collect();
 
-    let member = guild_id.member(ctx.serenity_context, interaction.user.id).await.wrap_err("No member")?;
+    let member = guild_id.member(ctx.serenity_context, user_id).await.wrap_err("Member not found")?;
+
     let current: HashSet<_> = member.roles.iter().cloned().collect();
     let current: HashSet<_> = current.intersection(&selectable).collect();
 
@@ -98,35 +121,4 @@ async fn read_role_button_data(data: &impl With<ConfigT>, message_id: &str) -> R
     let data = data.with(|cfg| Ok(cfg.buttons.get(message_id).ok_or_eyre("Unknown role button")?.clone())).await?;
     ensure!(!data.roles.is_empty(), "No roles have been configured for this button");
     Ok(data)
-}
-
-fn role_selection_message(
-    role_set_id: &str,
-    guild_roles: &HashMap<RoleId, Role>,
-    member_roles: &HashSet<&RoleId>,
-    selectable_roles: impl IntoIterator<Item = RoleData>,
-) -> Result<CreateReply> {
-    let options: Vec<_> = selectable_roles
-        .into_iter()
-        .filter_map(|role| {
-            Some(
-                CreateSelectMenuOption::new(
-                    guild_roles.get(&role.role_id)?.name.clone(),
-                    role.role_id.get().to_string(),
-                )
-                .description(role.description)
-                .emoji(role.emoji)
-                .default_selection(member_roles.contains(&role.role_id)),
-            )
-        })
-        .collect();
-    let max_values = options.len() as u8;
-
-    Ok(CreateReply::new()
-        .components(vec![CreateActionRow::SelectMenu(
-            CreateSelectMenu::new(format!("{SELECT_ID}:{role_set_id}"), CreateSelectMenuKind::String { options })
-                .min_values(0)
-                .max_values(max_values),
-        )])
-        .ephemeral(true))
 }
