@@ -2,7 +2,7 @@ use crate::message_file::MessageFile;
 use crate::util::{code_block_or_file, diff};
 use bot_core::ext::create_reply::CreateReplyExt as _;
 use bot_core::ext::option::OptionExt as _;
-use bot_core::{CmdContext, State};
+use bot_core::{CmdContext, State, deferred_message};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use poise::serenity_prelude::{
     Cache, CacheHttp, ChannelId, CreateAttachment, CreateAutocompleteResponse, CreateInputText, CreateQuickModal,
@@ -275,7 +275,7 @@ async fn edit_in_modal<D: State<GuildConfig<impl ConfigDataT>>>(
         return Ok(None);
     };
 
-    modal_response.interaction.defer_ephemeral(ctx).await?;
+    deferred_message(ctx.serenity_context(), &modal_response.interaction).await?;
 
     ctx.data()
         .state()
