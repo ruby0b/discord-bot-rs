@@ -1,14 +1,15 @@
 use eyre::Result;
 use poise::CreateReply;
 use poise::serenity_prelude::{
-    Builder as _, CommandInteraction, ComponentInteraction, Context, CreateAttachment, CreateInteractionResponse,
-    Message, ModalInteraction,
+    Builder as _, CommandInteraction, ComponentInteraction, Context, CreateAttachment, CreateEmbed,
+    CreateInteractionResponse, Message, ModalInteraction,
 };
 
 // todo generalize ComponentInteraction and ModalInteraction
 #[async_trait::async_trait]
 pub trait CreateReplyExt {
     fn attachments(self, attachments: impl IntoIterator<Item = CreateAttachment>) -> Self;
+    fn embeds(self, embeds: impl IntoIterator<Item = CreateEmbed>) -> Self;
     async fn respond_to_component(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<()>;
     async fn followup_to_component(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<Message>;
     async fn followup_to_command(self, ctx: &Context, interaction: &CommandInteraction) -> Result<Message>;
@@ -24,6 +25,14 @@ impl CreateReplyExt for CreateReply {
         let mut this = self;
         for attachment in attachments {
             this = this.attachment(attachment);
+        }
+        this
+    }
+
+    fn embeds(self, embeds: impl IntoIterator<Item = CreateEmbed>) -> Self {
+        let mut this = self;
+        for embed in embeds {
+            this = this.embed(embed);
         }
         this
     }

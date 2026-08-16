@@ -95,11 +95,13 @@ pub async fn button<D: UserData>(
     buttons.push(button);
 
     CreateReply::new()
+        .content(bot_message.content.clone())
+        .embeds(bot_message.embeds.iter().cloned().map(|e| e.into()))
         .components(vec![CreateActionRow::Buttons(buttons)])
         .edit_message(ctx.serenity_context(), &bot_message)
         .await?;
 
-    ctx.say(format!("Role button added: {}", bot_message.link())).await?;
+    ctx.say(format!("Button added: {}", bot_message.link())).await?;
     Ok(())
 }
 
