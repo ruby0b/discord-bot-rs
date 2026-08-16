@@ -1,20 +1,19 @@
-use bot_core::choice_parameters::ButtonStyleParameter;
+use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt as _;
-use bot_core::{CmdContext, EvtContext, UserData, With};
+use bot_core::{EvtContext, UserData, With};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
-use poise::serenity_prelude as serenity;
 use poise::serenity_prelude::all::{
-    Builder, ButtonStyle, ComponentInteraction, ComponentInteractionDataKind, CreateActionRow, CreateButton,
-    CreateInteractionResponse, CreateInteractionResponseMessage, EditMessage, Message, MessageId, ReactionType, Role,
-    RoleId,
+    ComponentInteraction, ComponentInteractionDataKind, CreateActionRow, ReactionType, Role, RoleId,
 };
+use poise::serenity_prelude::{CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption};
+use poise::{CreateReply, serenity_prelude as serenity};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 pub const SHOW_ROLE_SELECTION_ID: &str = "show_role_selection";
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Default)]
 pub struct ConfigT {
-    buttons: BTreeMap<MessageId, RoleButtonData>,
+    buttons: BTreeMap<String, RoleButtonData>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -31,171 +30,40 @@ struct RoleData {
     emoji: ReactionType,
 }
 
-/// Manage role buttons
-#[poise::command(
-    slash_command,
-    subcommands("new", "insert", "remove", "on_click"),
-    subcommand_required = true,
-    required_permissions = "MANAGE_GUILD",
-    default_member_permissions = "MANAGE_GUILD"
-)]
-pub async fn role_button<D: With<ConfigT>>(_ctx: CmdContext<'_, D>) -> Result<()> {
-    Ok(())
-}
-
-/// Add a new role button to a bot message
-#[poise::command(slash_command, guild_only)]
-pub async fn new<D: With<ConfigT>>(
-    ctx: CmdContext<'_, D>,
-    #[description = "Link to a message sent by this bot"] bot_message: Message,
-    #[description = "Button label"] button_label: Option<String>,
-    #[description = "Button style"] button_style: Option<ButtonStyleParameter>,
-) -> Result<()> {
-    ctx.defer().await?;
-
-    ensure!(bot_message.author.id == ctx.framework().bot_id(), "That message wasn't sent by me");
-    ctx.data()
-        .with_mut_ok(|cfg| {
-            cfg.buttons.insert(bot_message.id, RoleButtonData { on_click: None, roles: vec![] });
-        })
-        .await?;
-
-    EditMessage::new()
-        .components(vec![CreateActionRow::Buttons(vec![
-            CreateButton::new(SHOW_ROLE_SELECTION_ID)
-                .label(button_label.as_ref().map_or("Select Roles", |s| s))
-                .style(button_style.map_or(ButtonStyle::Primary, |s| s.into())),
-        ])])
-        .execute(ctx, (bot_message.channel_id, bot_message.id, None))
-        .await?;
-
-    ctx.say("Role button added").await?;
-    Ok(())
-}
-
-/// Insert a role into an existing role button's list
-#[poise::command(slash_command)]
-pub async fn insert<D: With<ConfigT>>(
-    ctx: CmdContext<'_, D>,
-    #[description = "Link to a message with a role button"] message_with_button: Message,
-    #[description = "Role to add"] role: Role,
-    #[description = "Description of the role"] description: String,
-    #[string]
-    #[description = "Emoji to use for the role"]
-    emoji: ReactionType,
-) -> Result<()> {
-    ctx.defer().await?;
-
-    let role_data = RoleData { role_id: role.id, description, emoji };
-    ctx.data()
-        .with_mut(|cfg| {
-            let role_button = cfg.buttons.get_mut(&message_with_button.id).ok_or_eyre("Unknown role button")?;
-            let roles = &mut role_button.roles;
-
-            if let Some(role_index) = roles.iter().position(|r| r.role_id == role.id) {
-                roles[role_index] = role_data.clone();
-            } else {
-                roles.push(role_data.clone());
-            }
-
-            Ok(())
-        })
-        .await?;
-
-    ctx.say(format!("Added role to button: {role_data:?}")).await?;
-    Ok(())
-}
-
-/// Remove a role from an existing role button's list
-#[poise::command(slash_command)]
-pub async fn remove<D: With<ConfigT>>(
-    ctx: CmdContext<'_, D>,
-    #[description = "Link to a message with a role button"] message_with_button: Message,
-    #[description = "Role to remove"] role: Role,
-) -> Result<()> {
-    ctx.defer().await?;
-
-    let role_data = ctx
-        .data()
-        .with_mut(|cfg| {
-            let role_button = cfg.buttons.get_mut(&message_with_button.id).ok_or_eyre("Unknown role button")?;
-            let roles = &mut role_button.roles;
-
-            let role_index = roles
-                .iter()
-                .position(|r| r.role_id == role.id)
-                .ok_or_eyre("The role is not configured for that role button")?;
-
-            Ok(roles.remove(role_index))
-        })
-        .await?;
-
-    ctx.say(format!("Removed role: {role_data:?}")).await?;
-    Ok(())
-}
-
-/// Set a role that you get when you click the button
-#[poise::command(slash_command)]
-pub async fn on_click<D: With<ConfigT>>(
-    ctx: CmdContext<'_, D>,
-    #[description = "Link to a message with a role button"] message_with_button: Message,
-    #[description = "Role to get on click"] role: Option<Role>,
-) -> Result<()> {
-    ctx.defer().await?;
-
-    let role = role.as_ref();
-    let role_id = ctx
-        .data()
-        .with_mut(|cfg| {
-            let role_button = cfg.buttons.get_mut(&message_with_button.id).ok_or_eyre("Unknown role button")?;
-            role_button.on_click = role.map(|r| r.id);
-            Ok(role.map(|r| r.id))
-        })
-        .await?;
-
-    ctx.say(format!("Added on_click role to button: {role_id:?}")).await?;
-    Ok(())
-}
-
 pub async fn btn_show_role_selection(
     ctx: EvtContext<'_, impl With<ConfigT>>,
-    int: &ComponentInteraction,
+    interaction: &ComponentInteraction,
+    param: &str,
 ) -> Result<()> {
-    let button_message_id = int.message.id;
-    let guild_id = int.guild_id.ok_or_eyre("No guild")?;
-    let guild_roles = guild_id.to_guild_cached(ctx.serenity_context).some()?.roles.clone();
+    let role_set_id = param;
+    let guild_id = interaction.guild_id.some()?;
+    let guild_roles = {
+        let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
+        guild.roles.clone()
+    };
 
     let initial_response = {
-        let role_button = read_role_button_data(ctx.user_data, &button_message_id).await?;
-        let member = guild_id.member(ctx.serenity_context, int.user.id).await.wrap_err("No member")?;
+        let role_button = read_role_button_data(ctx.user_data, role_set_id).await?;
+        let member = {
+            let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
+            guild.members.get(&interaction.user.id).ok_or_eyre("No member")?.clone()
+        };
 
-        if let Some(on_click_role) = role_button.on_click {
-            member.add_role(ctx.serenity_context, on_click_role).await?;
-        }
+        ensure!(!role_button.roles.is_empty(), "No roles have been configured for this button");
 
-        if role_button.roles.is_empty() {
-            int.create_response(
-                ctx.serenity_context,
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new()
-                        .content("No roles have been configured for this button")
-                        .ephemeral(true),
-                ),
-            )
+        role_selection_message(&guild_roles, &member.roles.iter().collect(), role_button.roles)?
+            .respond_to_component(ctx.serenity_context, interaction)
             .await?;
-            return Ok(());
-        }
 
-        int.create_response(
-            ctx.serenity_context,
-            CreateInteractionResponse::Message(role_selection_message(
-                &guild_roles,
-                &member.roles.iter().collect(),
-                role_button.roles,
-            )?),
-        )
-        .await?;
-        int.get_response(ctx.serenity_context).await?
+        let initial_response = interaction.get_response(ctx.serenity_context).await?;
+
+        if let Some(on_click_role) = role_button.on_click
+            && !member.roles.contains(&on_click_role)
+        {
+            member.add_role(ctx.serenity_context, on_click_role).await?;
+        };
+
+        initial_response
     };
 
     while let Some(int) = initial_response.await_component_interaction(ctx.serenity_context).await {
@@ -204,7 +72,7 @@ pub async fn btn_show_role_selection(
             continue;
         };
 
-        let role_button = read_role_button_data(ctx.user_data, &button_message_id).await?;
+        let role_button = read_role_button_data(ctx.user_data, role_set_id).await?;
         let selectable: HashSet<_> = role_button.roles.iter().map(|r| r.role_id).collect();
 
         let selected: HashSet<_> = values.into_iter().filter_map(|s| s.parse().ok()).collect();
@@ -221,21 +89,15 @@ pub async fn btn_show_role_selection(
             member.remove_role(ctx.serenity_context, role_id).await?;
         }
 
-        int.create_response(
-            ctx.serenity_context,
-            CreateInteractionResponse::UpdateMessage(role_selection_message(
-                &guild_roles,
-                &selected,
-                role_button.roles,
-            )?),
-        )
-        .await?;
+        role_selection_message(&guild_roles, &member.roles.iter().collect(), role_button.roles)?
+            .update_to_component(ctx.serenity_context, interaction)
+            .await?;
     }
 
     Ok(())
 }
 
-async fn read_role_button_data(data: &impl With<ConfigT>, message_id: &MessageId) -> Result<RoleButtonData> {
+async fn read_role_button_data(data: &impl With<ConfigT>, message_id: &str) -> Result<RoleButtonData> {
     data.with(|cfg| Ok(cfg.buttons.get(message_id).ok_or_eyre("Unknown role button")?.clone())).await
 }
 
@@ -243,12 +105,12 @@ fn role_selection_message(
     guild_roles: &HashMap<RoleId, Role>,
     member_roles: &HashSet<&RoleId>,
     selectable_roles: impl IntoIterator<Item = RoleData>,
-) -> Result<CreateInteractionResponseMessage> {
+) -> Result<CreateReply> {
     let options: Vec<_> = selectable_roles
         .into_iter()
         .filter_map(|role| {
             Some(
-                serenity::CreateSelectMenuOption::new(
+                CreateSelectMenuOption::new(
                     guild_roles.get(&role.role_id)?.name.clone(),
                     role.role_id.get().to_string(),
                 )
@@ -260,9 +122,9 @@ fn role_selection_message(
         .collect();
     let max_values = options.len() as u8;
 
-    Ok(CreateInteractionResponseMessage::new()
-        .components(vec![serenity::CreateActionRow::SelectMenu(
-            serenity::CreateSelectMenu::new("~roles", serenity::CreateSelectMenuKind::String { options })
+    Ok(CreateReply::new()
+        .components(vec![CreateActionRow::SelectMenu(
+            CreateSelectMenu::new("~roles", CreateSelectMenuKind::String { options })
                 .min_values(0)
                 .max_values(max_values),
         )])

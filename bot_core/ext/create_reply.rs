@@ -13,6 +13,7 @@ pub trait CreateReplyExt {
     async fn followup_to_component(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<Message>;
     async fn followup_to_command(self, ctx: &Context, interaction: &CommandInteraction) -> Result<Message>;
     async fn followup_to_modal(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message>;
+    async fn update_to_component(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<()>;
     async fn edit_initial_modal_response(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message>;
     async fn edit_message(self, ctx: &Context, message: &Message) -> Result<Message>;
 }
@@ -43,6 +44,12 @@ impl CreateReplyExt for CreateReply {
 
     async fn followup_to_modal(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message> {
         Ok(self.to_slash_followup_response(Default::default()).execute(ctx, (None, &interaction.token)).await?)
+    }
+
+    async fn update_to_component(self, ctx: &Context, interaction: &ComponentInteraction) -> Result<()> {
+        Ok(CreateInteractionResponse::UpdateMessage(self.to_slash_initial_response(Default::default()))
+            .execute(ctx, (interaction.id, &interaction.token))
+            .await?)
     }
 
     async fn edit_initial_modal_response(self, ctx: &Context, interaction: &ModalInteraction) -> Result<Message> {

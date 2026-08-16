@@ -45,24 +45,24 @@ async fn main() -> Result<()> {
 
     let options = poise::FrameworkOptions {
         commands: vec![
+            bot_cmd_ask::ask(),
+            bot_cmd_ask::configure_ask_game(),
+            bot_cmd_ask::delete_ask_game(),
+            bot_cmd_bedtime::bedtime(),
+            bot_cmd_bedtime::bedtimes(),
+            bot_cmd_economy::account(),
+            bot_cmd_economy::gamble(),
+            bot_cmd_economy::leaderboard(),
+            bot_cmd_eval::d2(),
+            bot_cmd_eval::math(),
+            bot_cmd_eval::typst(),
+            bot_cmd_message::button(),
+            bot_cmd_message::message(),
+            bot_cmd_periodic_region_change::periodic_region_change(),
             cmd::register(),
             cmd::reregister(),
             config::config(),
             config::restore(),
-            bot_cmd_ask::ask(),
-            bot_cmd_ask::delete_ask_game(),
-            bot_cmd_ask::configure_ask_game(),
-            bot_cmd_bedtime::bedtime(),
-            bot_cmd_bedtime::bedtimes(),
-            bot_cmd_eval::d2(),
-            bot_cmd_eval::math(),
-            bot_cmd_eval::typst(),
-            bot_cmd_message::message(),
-            bot_cmd_periodic_region_change::periodic_region_change(),
-            bot_cmd_role_buttons::role_button(),
-            bot_cmd_economy::account(),
-            bot_cmd_economy::gamble(),
-            bot_cmd_economy::leaderboard(),
         ],
         prefix_options: poise::PrefixFrameworkOptions { prefix: Some("=".into()), ..Default::default() },
         on_error: |error| Box::pin(async { error_handling::on_error(error).await }),
@@ -126,7 +126,7 @@ async fn main() -> Result<()> {
                                 bot_cmd_bedtime::btn_select_bedtime(framework, component).await?;
                             }
                             bot_cmd_role_buttons::SHOW_ROLE_SELECTION_ID => {
-                                bot_cmd_role_buttons::btn_show_role_selection(framework, component).await?;
+                                bot_cmd_role_buttons::btn_show_role_selection(framework, component, param).await?;
                             }
                             bot_cmd_economy::ACCOUNT_BUTTON_ID => {
                                 bot_cmd_economy::btn_account(framework, component).await?;

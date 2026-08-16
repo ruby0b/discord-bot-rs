@@ -51,7 +51,11 @@ where
     })
 }
 
-pub(crate) fn spawn_delayed_update(data: &(impl With<ConfigT> + State<StateT>), msg_id: MessageId, start: std::time::Duration) {
+pub(crate) fn spawn_delayed_update(
+    data: &(impl With<ConfigT> + State<StateT>),
+    msg_id: MessageId,
+    start: std::time::Duration,
+) {
     spawn(data.clone(), async move |data| {
         tokio::time::sleep(start).await;
         send(&data, Command::Update(msg_id)).await

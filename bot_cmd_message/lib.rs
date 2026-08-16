@@ -1,8 +1,14 @@
+use bot_core::choice_parameters::ButtonStyleParameter;
 use bot_core::color_parameter::HexColorParameter;
+use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::{CmdContext, UserData};
-use eyre::Result;
+use eyre::{Result, bail, ensure};
+use poise::CreateReply;
 use poise::serenity_prelude::all::Builder;
-use poise::serenity_prelude::{CreateEmbed, CreateMessage, GuildChannel};
+use poise::serenity_prelude::{
+    ActionRow, ActionRowComponent, ButtonStyle, CreateActionRow, CreateButton, CreateEmbed, CreateMessage,
+    GuildChannel, Message, ReactionType,
+};
 
 /// Post a bot message
 #[poise::command(
@@ -49,4 +55,63 @@ pub async fn message<D: UserData>(
 
     ctx.say(format!("Message sent: {}", msg.link())).await?;
     Ok(())
+}
+
+/// Add a button to a bot message
+#[poise::command(
+    slash_command,
+    guild_only,
+    required_permissions = "MANAGE_GUILD",
+    default_member_permissions = "MANAGE_GUILD"
+)]
+pub async fn button<D: UserData>(
+    ctx: CmdContext<'_, D>,
+    #[description = "Link to a message sent by this bot"] bot_message: Message,
+    #[description = "Button ID"] button_id: String,
+    #[description = "Button label"] button_label: Option<String>,
+    #[string]
+    #[description = "Button emoji"]
+    button_emoji: Option<ReactionType>,
+    #[description = "Button style"] button_style: Option<ButtonStyleParameter>,
+    #[description = "Clear all existing components of the message"] clear: Option<bool>,
+) -> Result<()> {
+    ctx.defer().await?;
+
+    ensure!(bot_message.author.id == ctx.framework().bot_id(), "That message wasn't sent by me");
+
+    let button = CreateButton::new(button_id).style(button_style.map_or(ButtonStyle::Primary, |s| s.into()));
+    let button = match (button_label, button_emoji) {
+        (Some(label), Some(emoji)) => button.label(label).emoji(emoji),
+        (None, Some(emoji)) => button.emoji(emoji),
+        (Some(label), None) => button.label(label),
+        (None, None) => bail!("Buttons need at least a label or an emoji"),
+    };
+
+    let mut buttons = match (clear.unwrap_or(false), &bot_message.components[..]) {
+        (true, _) | (false, []) => vec![],
+        (false, [row]) => button_row_to_create_buttons_vec(row)?,
+        (false, [_, _, ..]) => bail!("Message has more than 1 component row"),
+    };
+    buttons.push(button);
+
+    CreateReply::new()
+        .components(vec![CreateActionRow::Buttons(buttons)])
+        .edit_message(ctx.serenity_context(), &bot_message)
+        .await?;
+
+    ctx.say(format!("Role button added: {}", bot_message.link())).await?;
+    Ok(())
+}
+
+fn button_row_to_create_buttons_vec(row: &ActionRow) -> Result<Vec<CreateButton>> {
+    let mut buttons = vec![];
+    for component in &row.components {
+        match component {
+            ActionRowComponent::Button(button) => {
+                buttons.push(button.clone().into());
+            }
+            _ => bail!("Unexpected component: {component:?}"),
+        }
+    }
+    Ok(buttons)
 }
