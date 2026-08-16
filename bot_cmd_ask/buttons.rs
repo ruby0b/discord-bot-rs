@@ -288,7 +288,7 @@ pub async fn btn_show_game_role_selection(
 }
 
 pub async fn select_roles(
-    ctx: EvtContext<'_, impl With<ConfigT>>,
+    ctx: EvtContext<'_, impl With<ConfigT> + State<StateT>>,
     interaction: &ComponentInteraction,
     param: &str,
 ) -> Result<()> {
@@ -318,6 +318,8 @@ pub async fn select_roles(
             }
         })
         .await?;
+
+    ctx.user_data.state().game_role_sender.get().some()?.send(worker_game_roles::Command::Update).await?;
 
     Ok(())
 }
