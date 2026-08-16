@@ -223,7 +223,7 @@ pub async fn btn_show_parent_role_buttons(
             .map(|role| {
                 CreateButton::new(format!("{SHOW_GAME_ROLES_SELECT_ID}:{}", role.id))
                     .label(role.name.clone())
-                    .style(ButtonStyle::Primary)
+                    .style(ButtonStyle::Secondary)
             })
             .chunks(5)
             .into_iter()
@@ -264,8 +264,16 @@ pub async fn btn_show_game_role_selection(
             .into_iter()
             .filter_map(|(role_id, game)| Some((guild.roles.get(&role_id)?, game)))
             .map(|(role, game)| {
-                CreateSelectMenuOption::new(role.name.clone(), role.id.to_string())
-                    .default_selection(!game.opted_out_users.contains(&user_id))
+                let mut option = CreateSelectMenuOption::new(role.name.clone(), role.id.to_string())
+                    .default_selection(!game.opted_out_users.contains(&user_id));
+                if let Some(mut description) = game.defaults.description {
+                    if description.len() > 100 {
+                        description.truncate(97);
+                        description.push('…');
+                    }
+                    option = option.description(description);
+                }
+                option
             })
             .collect_vec()
     };
