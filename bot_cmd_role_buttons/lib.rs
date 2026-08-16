@@ -91,9 +91,9 @@ pub async fn select_roles(
 
     {
         let guild = ctx.serenity_context.cache.guild(guild_id).some()?;
-        role_selection_message(role_set_id, &guild.roles, &member.roles.iter().collect(), role_button.roles)?
+        role_selection_message(role_set_id, &guild.roles, &selected, role_button.roles)?
     }
-    .update_to_component(ctx.serenity_context, interaction)
+    .respond_to_component(ctx.serenity_context, interaction)
     .await?;
 
     Ok(())
