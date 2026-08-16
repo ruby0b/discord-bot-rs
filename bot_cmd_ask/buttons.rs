@@ -263,6 +263,7 @@ pub async fn btn_show_game_role_selection(
         game_roles
             .into_iter()
             .filter_map(|(role_id, game)| Some((guild.roles.get(&role_id)?, game)))
+            .sorted_by_key(|(role, _)| &role.name)
             .map(|(role, game)| {
                 let mut option = CreateSelectMenuOption::new(role.name.clone(), role.id.to_string())
                     .default_selection(!game.opted_out_users.contains(&user_id));
