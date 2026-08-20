@@ -10,7 +10,7 @@
 }:
 let
   main = "discord-bot-rs";
-  craneFenix = crane.overrideToolchain fenix.minimal.toolchain;
+  craneFenix = crane.overrideToolchain fenix.complete.toolchain;
   runtime-dependencies = [
     typst
     rstrict

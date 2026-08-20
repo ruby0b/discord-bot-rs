@@ -17,9 +17,7 @@ in
   inherit packages;
   devShells.default = pkgs.mkShell {
     inputsFrom = [ packages.discord-bot-rs ];
-    packages = packages.discord-bot-rs.runtime-dependencies ++ [
-      packages.fenix.complete.toolchain
-    ];
+    packages = packages.discord-bot-rs.runtime-dependencies;
     env = { inherit (packages.discord-bot-rs) RUSTFLAGS; };
   };
 }
