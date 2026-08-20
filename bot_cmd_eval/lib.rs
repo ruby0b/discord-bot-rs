@@ -6,16 +6,6 @@ use eyre::Result;
 use poise::CreateReply;
 use poise::serenity_prelude::CreateAttachment;
 
-/// Create a diagram using the d2 language
-#[poise::command(slash_command, guild_only)]
-pub async fn d2<D: UserData>(ctx: CmdContext<'_, D>, #[description = "d2 code"] code: String) -> Result<()> {
-    ctx.defer().await?;
-    let svg = run_in_sandbox("d2", &["-", "-"], code.as_bytes()).await?;
-    let png = run_in_sandbox("magick", &["-", "png:-"], &svg).await?;
-    ctx.send(CreateReply::new().attachment(CreateAttachment::bytes(png, "d2.png"))).await?;
-    Ok(())
-}
-
 static PRELUDE: &str = r#"
 #set page(width: auto, height: auto, margin: 5pt)
 "#;

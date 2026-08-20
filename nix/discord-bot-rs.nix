@@ -1,8 +1,6 @@
 {
   crane,
   fenix,
-  d2,
-  imagemagick,
   lib,
   libopus,
   makeWrapper,
@@ -14,8 +12,6 @@ let
   main = "discord-bot-rs";
   craneFenix = crane.overrideToolchain fenix.minimal.toolchain;
   runtime-dependencies = [
-    d2
-    imagemagick
     typst
     rstrict
   ];
