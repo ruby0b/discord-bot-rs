@@ -25,16 +25,16 @@
       },
       "branch": "monthly",
       "submodules": false,
-      "revision": "8160d67d2693a1f7ea219db159ccdc29ae632918",
-      "url": "https://github.com/nix-community/fenix/archive/8160d67d2693a1f7ea219db159ccdc29ae632918.tar.gz",
-      "hash": "sha256-1y6LHeumqA2lnUZap2yor+g4jMFtno5mx119LEv+dQQ="
+      "revision": "e6dc05cac3bc08fc8b00cc1571a456a47d7ca782",
+      "url": "https://github.com/nix-community/fenix/archive/e6dc05cac3bc08fc8b00cc1571a456a47d7ca782.tar.gz",
+      "hash": "sha256-7HLoqxURizfu1Gs5Xg0OTwi9s9Ewh7JpBeE2xVoZHAU="
     },
     "nixpkgs": {
       "type": "Channel",
       "name": "nixos-26.05",
       "artifact": "nixexprs.tar.xz",
-      "url": "https://releases.nixos.org/nixos/26.05/nixos-26.05.1947.a0374025a863/nixexprs.tar.xz",
-      "hash": "sha256-PoRRDfm1khYEJCk5KyX4Snud03VzRcmxKil5n6drTI0="
+      "url": "https://releases.nixos.org/nixos/26.05/nixos-26.05.8045.b18a4b905f8d/nixexprs.tar.xz",
+      "hash": "sha256-BA7sSNjLDuPGSOYBGpr6WQjke1MQ8AZpJ8GlYZM/mOc="
     }
   },
   "version": 8
