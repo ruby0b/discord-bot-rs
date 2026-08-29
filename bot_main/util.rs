@@ -1,5 +1,4 @@
 use imara_diff::{BasicLineDiffPrinter, Diff, InternedInput, UnifiedDiffConfig};
-use once_cell::sync::Lazy;
 use poise::serenity_prelude::CreateAttachment;
 
 pub fn diff(before: &str, after: &str) -> String {
@@ -11,21 +10,20 @@ pub fn diff(before: &str, after: &str) -> String {
 
 pub fn code_block_or_file(
     description: impl Into<String>,
-    code: impl Into<Vec<u8>>,
+    code: &str,
     filestem: &str,
     extension: &str,
 ) -> (String, Vec<CreateAttachment>) {
     let description = description.into();
-    let code = code.into();
+    let code_bytes: Vec<u8> = code.into();
 
     // Character limit is 2000 (bytes? glyphs?) minus the backticks and extension, we'll play it safe.
     // Triple backticks would end the code block early, so we can't allow them in the code.
-    static RE: Lazy<regex::bytes::Regex> = Lazy::new(|| regex::bytes::Regex::new(r"```").unwrap());
-    if code.len() + description.len() > 1980 || RE.is_match(&code) {
-        let attachment = CreateAttachment::bytes(code.to_vec(), format!("{filestem}.{extension}"));
+    if code_bytes.len() + description.len() > 1980 || code.contains("```") {
+        let attachment = CreateAttachment::bytes(code_bytes.to_vec(), format!("{filestem}.{extension}"));
         (description, vec![attachment])
     } else {
-        let code = String::from_utf8_lossy(&code);
+        let code = String::from_utf8_lossy(&code_bytes);
         (format!("{description}\n```{extension}\n{code}\n```"), vec![])
     }
 }

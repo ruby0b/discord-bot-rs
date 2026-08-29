@@ -139,10 +139,14 @@ async fn fetch_game_description(data: &impl With<ConfigT>, msg_id: MessageId) ->
             Some(url) => {
                 tracing::debug!("fetching game description from {}", url);
                 let html = reqwest::get(url.as_str()).await?.text().await?;
-                let document = scraper::Html::parse_document(&html);
-                let selector = scraper::Selector::parse(".game_description_snippet").unwrap();
-                let element = document.select(&selector).next().ok_or_eyre(format!("No game description on {url}"))?;
-                element.text().collect::<String>()
+                let dom = tl::parse(&html, tl::ParserOptions::default())?;
+                dom.get_elements_by_class_name("game_description_snippet")
+                    .next()
+                    .ok_or_eyre(format!("No game description on {url}"))?
+                    .get(dom.parser())
+                    .expect("tl error")
+                    .inner_text(dom.parser())
+                    .to_string()
             }
             None => return Ok(()),
         };

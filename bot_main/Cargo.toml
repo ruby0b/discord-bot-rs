@@ -28,7 +28,6 @@ imara-diff.workspace = true
 itertools.workspace = true
 once_cell.workspace = true
 poise.workspace = true
-regex.workspace = true
 rustls.workspace = true
 serde_yaml_ng.workspace = true
 serde.workspace = true

@@ -90,7 +90,7 @@ impl<DataT: ConfigDataT> GuildConfig<DataT> {
             let link = file.message_id.link(file.channel_id, file.guild_id);
             let (content, files) = code_block_or_file(
                 format!("✏️ Overwrote config: {link}"),
-                diff(old_str.as_ref(), &new_str).as_bytes(),
+                diff(old_str.as_ref(), &new_str).as_str(),
                 CONFIG_NAME,
                 "diff",
             );
@@ -198,7 +198,7 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
     let Some(int) = match operation {
         Some(EditOperation::Show) => {
             let (content, files) =
-                code_block_or_file(format!("Value of `{path}`:"), value_str, CONFIG_NAME, CONFIG_EXT);
+                code_block_or_file(format!("Value of `{path}`:"), &value_str, CONFIG_NAME, CONFIG_EXT);
             ctx.send(CreateReply::new().content(content).attachments(files)).await?;
             return Ok(());
         }
@@ -255,7 +255,7 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
     let new_root = ctx.data().state().with(|cfg| to_yaml_value(cfg)).await?;
     let new_root_str = to_yaml_string(&new_root)?;
     let diff = diff(&root_str, &new_root_str);
-    let (content, files) = code_block_or_file(format!("✏️ Wrote `{path}`:"), diff, CONFIG_NAME, "diff");
+    let (content, files) = code_block_or_file(format!("✏️ Wrote `{path}`:"), &diff, CONFIG_NAME, "diff");
 
     CreateReply::new().content(content).attachments(files).followup_to_modal(ctx.serenity_context(), &int).await?;
 
@@ -316,7 +316,7 @@ pub async fn restore<D: State<GuildConfig<impl ConfigDataT>>>(ctx: CmdContext<'_
     let old_str = to_yaml_string(&old)?;
 
     let diff = diff(&old_str, &new_str);
-    let (content, files) = code_block_or_file("✏️ Restored:".to_string(), diff, CONFIG_NAME, "diff");
+    let (content, files) = code_block_or_file("✏️ Restored:".to_string(), &diff, CONFIG_NAME, "diff");
 
     let reply = CreateReply::new().content(content).attachments(
         files

@@ -17,7 +17,6 @@ use poise::CreateReply;
 use poise::serenity_prelude::{
     ButtonStyle, Colour, CreateActionRow, CreateButton, CreateEmbed, Mentionable as _, UserId,
 };
-use serde_with::{DisplayFromStr, serde_as};
 use std::collections::BTreeMap;
 use thousands::Separable;
 use uuid::Uuid;
@@ -28,13 +27,11 @@ pub const BUYIN_BUTTON_ID: &str = "economy.buyin";
 pub const PAY_TABLE_BUTTON_ID: &str = "economy.pay_table";
 pub const PAY_PLAYER_BUTTON_ID: &str = "economy.pay_player";
 
-#[serde_as]
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq, sensible::Default)]
 pub struct ConfigT {
     currency: Currency,
     daily_income: DailyIncome,
     account: BTreeMap<UserId, UserAccount>,
-    #[serde_as(as = "BTreeMap<DisplayFromStr, _>")]
     gambling_tables: BTreeMap<Uuid, GamblingTable>,
 }
 
