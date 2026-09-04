@@ -92,3 +92,14 @@ pub fn naive_time_to_next_datetime(naive_time: NaiveTime) -> Option<DateTime<Loc
     let date = if naive_time > now.time() { now.date() } else { now.date().succ_opt().unwrap() };
     Local.from_local_datetime(&NaiveDateTime::new(date, naive_time)).single()
 }
+
+/// Truncate a string to a maximum length, appending a suffix if truncated.
+pub fn limit_string(s: &str, max_len: usize, suffix: &str) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        let mut truncated = s.chars().take(max_len - suffix.len()).collect::<String>();
+        truncated.push_str(suffix);
+        truncated
+    }
+}

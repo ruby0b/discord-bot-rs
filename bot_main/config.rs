@@ -345,6 +345,7 @@ async fn autocomplete_config<U: State<GuildConfig<impl ConfigDataT>>, E>(
 }
 
 mod autocomplete_yaml {
+    use bot_core::limit_string;
     use itertools::Itertools as _;
     use poise::serenity_prelude::AutocompleteChoice;
     use serde_yaml_ng::Value;
@@ -355,19 +356,26 @@ mod autocomplete_yaml {
         let (last, rest) = path.split_last().unwrap_or((&"", &[]));
         let value = get_path(root, rest.iter().copied());
 
-        let keys: Vec<String> = value.map_or(vec![], |v| match v {
-            Value::Mapping(obj) => obj.iter().filter_map(|(k, _v)| k.as_str().map(ToString::to_string)).collect(),
-            Value::Sequence(arr) => arr.iter().enumerate().map(|(i, _v)| i.to_string()).collect(),
+        let keys_with_previews: Vec<(String, String)> = value.map_or(vec![], |v| match v {
+            Value::Mapping(obj) => obj
+                .iter()
+                .filter_map(|(k, v)| Some((k.as_str().map(ToString::to_string)?, v)))
+                .map(|(k, v)| (k, preview_value(v)))
+                .collect(),
+            Value::Sequence(arr) => arr.iter().enumerate().map(|(i, v)| (i.to_string(), preview_value(v))).collect(),
             _ => vec![],
         });
 
-        let exactly_matches_a_key = keys.iter().any(|value| value == last);
+        let exactly_matches_a_key = keys_with_previews.iter().any(|(value, _)| value == last);
 
-        let mut choices = keys
+        let mut choices = keys_with_previews
             .into_iter()
-            .filter(|value| value.starts_with(last))
-            .map(|value| rest.iter().chain(once(&value.as_str())).join("."))
-            .map(|value| AutocompleteChoice::new(value.clone(), value))
+            .filter(|(key, _)| key.starts_with(last))
+            .map(|(key, preview)| {
+                let key = rest.iter().chain(once(&key.as_str())).join(".");
+                let name_with_preview = limit_string(&format!("{key} {preview}"), 100, "…");
+                AutocompleteChoice::new(name_with_preview, key)
+            })
             .collect();
 
         if exactly_matches_a_key {
@@ -377,6 +385,10 @@ mod autocomplete_yaml {
         } else {
             choices
         }
+    }
+
+    fn preview_value(value: &Value) -> String {
+        serde_json::to_string(value).unwrap_or_else(|_| "<error>".to_string())
     }
 
     pub fn get_path(mut root: &Value, path: impl Iterator<Item = &str>) -> Option<&Value> {
