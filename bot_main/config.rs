@@ -345,13 +345,14 @@ async fn autocomplete_config<U: State<GuildConfig<impl ConfigDataT>>, E>(
 }
 
 mod autocomplete_yaml {
-    use bot_core::limit_string;
+    use bot_core::limit_chars;
     use itertools::Itertools as _;
     use poise::serenity_prelude::AutocompleteChoice;
     use serde_yaml_ng::Value;
     use std::iter::once;
 
     pub fn autocomplete_value(root: &Value, input: &str) -> Vec<AutocompleteChoice> {
+        let input = input.split(' ').next_back().unwrap_or(input).trim(); // ignore preview
         let path: Vec<&str> = input.split(".").collect();
         let (last, rest) = path.split_last().unwrap_or((&"", &[]));
         let value = get_path(root, rest.iter().copied());
@@ -373,8 +374,11 @@ mod autocomplete_yaml {
             .filter(|(key, _)| key.starts_with(last))
             .map(|(key, preview)| {
                 let key = rest.iter().chain(once(&key.as_str())).join(".");
-                let name_with_preview = limit_string(&format!("{key} {preview}"), 100, "…");
-                AutocompleteChoice::new(name_with_preview, key)
+                let key_chars = key.chars().count();
+                let preview = limit_chars(&preview, 100usize.saturating_sub(key_chars + 2), "…");
+                let spaces = " ".repeat(100usize.saturating_sub(key_chars + preview.chars().count()));
+                let key_with_preview = limit_chars(&format!("{preview}{spaces}{key}"), 100, "…");
+                AutocompleteChoice::new(key_with_preview.clone(), key_with_preview)
             })
             .collect();
 

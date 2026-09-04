@@ -94,12 +94,10 @@ pub fn naive_time_to_next_datetime(naive_time: NaiveTime) -> Option<DateTime<Loc
 }
 
 /// Truncate a string to a maximum length, appending a suffix if truncated.
-pub fn limit_string(s: &str, max_len: usize, suffix: &str) -> String {
-    if s.len() <= max_len {
+pub fn limit_chars(s: &str, max_chars: usize, suffix: &str) -> String {
+    if s.chars().count() <= max_chars {
         s.to_string()
     } else {
-        let mut truncated = s.chars().take(max_len - suffix.len()).collect::<String>();
-        truncated.push_str(suffix);
-        truncated
+        s.chars().take(max_chars - suffix.chars().count()).collect::<String>() + (suffix)
     }
 }
