@@ -12,8 +12,12 @@ pub(crate) async fn schedule_ask_updates(
     msg_id: MessageId,
     expiration: TimeDelta,
 ) {
+    spawn(data.clone(), async move |data| send(&data, Command::Update(msg_id)).await);
+
     let start = ask.start_time.signed_duration_since(Utc::now()).to_std().unwrap_or_default();
-    spawn_delayed_update(data, msg_id, start);
+    if !start.is_zero() {
+        spawn_delayed_update(data, msg_id, start);
+    }
 
     let disable = (expiration + (ask.start_time - Utc::now())).to_std().unwrap_or_default();
     spawn(data.clone(), async move |data| {
