@@ -1,8 +1,8 @@
 use crate::{ConfigT, Currency};
+use bot_core::msg::Msg;
 use bot_core::{CmdContext, With};
 use eyre::Result;
 use itertools::Itertools;
-use poise::CreateReply;
 use poise::serenity_prelude::{Colour, CreateEmbed, Mentionable};
 use std::cmp::Reverse;
 
@@ -23,9 +23,8 @@ pub async fn leaderboard<D: With<ConfigT>>(ctx: CmdContext<'_, D>) -> Result<()>
 
     let embed = CreateEmbed::new().title("Leaderboard").description(leaderboard).colour(Colour::DARK_GOLD);
 
-    let reply = CreateReply::new().embed(embed);
+    ctx.send(Msg::new().embed(embed).to_reply()).await?;
 
-    ctx.send(reply).await?;
     Ok(())
 }
 

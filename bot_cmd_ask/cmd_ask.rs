@@ -2,6 +2,7 @@ use crate::ask::{Ask, AskPlayer, AskPlayerState, AskRoleId};
 use crate::schedule_updates::schedule_ask_updates;
 use crate::{ConfigT, StateT};
 use bot_core::ext::option::OptionExt as _;
+use bot_core::msg::Msg;
 use bot_core::{CmdContext, State, With, naive_time_to_next_datetime};
 use chrono::{NaiveTime, Utc};
 use eyre::Result;
@@ -72,12 +73,12 @@ pub async fn ask<D: With<ConfigT> + State<StateT>>(
     };
 
     let msg_id = {
-        let reply = poise::CreateReply::default()
+        let msg = Msg::new()
             .content(format!("{} {}", ask.title, ask.content()))
             .embed(ask.embed())
             .allowed_mentions(CreateAllowedMentions::new().roles(ask.role_id.into_option()))
             .components(vec![ask.action_row()]);
-        let reply_handle = ctx.send(reply).await?;
+        let reply_handle = ctx.send(msg.to_reply()).await?;
         reply_handle.message().await?.id
     };
 

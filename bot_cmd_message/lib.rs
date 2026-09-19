@@ -1,9 +1,8 @@
 use bot_core::choice_parameters::ButtonStyleParameter;
 use bot_core::color_parameter::HexColorParameter;
-use bot_core::ext::create_reply::CreateReplyExt;
+use bot_core::msg::Msg;
 use bot_core::{CmdContext, UserData};
 use eyre::{Result, bail, ensure};
-use poise::CreateReply;
 use poise::serenity_prelude::{
     ActionRow, ActionRowComponent, Builder, ButtonStyle, CreateActionRow, CreateButton, CreateEmbed, CreateMessage,
     GuildChannel, Message, ReactionType,
@@ -93,7 +92,7 @@ pub async fn button<D: UserData>(
     };
     buttons.push(button);
 
-    CreateReply::new()
+    Msg::new()
         .content(bot_message.content.clone())
         .embeds(bot_message.embeds.iter().cloned().map(|e| e.into()))
         .components(vec![CreateActionRow::Buttons(buttons)])

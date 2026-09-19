@@ -1,17 +1,15 @@
 use crate::message_file::MessageFile;
 use crate::util::diff;
-use bot_core::ext::create_reply::CreateReplyExt as _;
 use bot_core::ext::option::OptionExt as _;
 use bot_core::{CmdContext, State, code_block_or_file, deferred_message};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
+use poise::ChoiceParameter;
 use poise::serenity_prelude::{
-    Cache, CacheHttp, ChannelId, Context, CreateAttachment, CreateAutocompleteResponse, CreateInputText, CreateMessage,
+    Cache, CacheHttp, ChannelId, Context, CreateAttachment, CreateAutocompleteResponse, CreateInputText,
     CreateQuickModal, GuildId, Http, InputTextStyle, InteractionId, Message, ModalInteraction,
 };
-use poise::{ChoiceParameter, CreateReply};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use std::iter;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{OnceCell, RwLock};
@@ -88,17 +86,14 @@ impl<DataT: ConfigDataT> GuildConfig<DataT> {
         let new_str = to_yaml_string(&cache)?;
         if old_str != new_str {
             let link = file.message_id.link(file.channel_id, file.guild_id);
-            let (content, files) = code_block_or_file(
+            let msg = code_block_or_file(
                 format!("✏️ Overwrote config: {link}"),
                 diff(old_str.as_ref(), &new_str).as_str(),
                 CONFIG_NAME,
                 "diff",
-            );
-            let msg = CreateMessage::new()
-                .content(content)
-                .files(files)
-                .add_file(CreateAttachment::bytes(old_str.as_bytes(), format!("old_{}", file.filename)));
-            if let Err(why) = message.channel_id.send_message(chttp, msg).await {
+            )
+            .attachment(CreateAttachment::bytes(old_str.as_bytes(), format!("old_{}", file.filename)));
+            if let Err(why) = msg.create_message(chttp, message.channel_id).await {
                 tracing::error!(%why, %old_str, "Failed to send old config");
             }
         }
@@ -197,9 +192,9 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
 
     let Some(int) = match operation {
         Some(EditOperation::Show) => {
-            let (content, files) =
-                code_block_or_file(format!("Value of `{path}`:"), &value_str, CONFIG_NAME, CONFIG_EXT);
-            ctx.send(CreateReply::new().content(content).attachments(files)).await?;
+            code_block_or_file(format!("Value of `{path}`:"), &value_str, CONFIG_NAME, CONFIG_EXT)
+                .respond_to_command(ctx.serenity_context(), app.interaction)
+                .await?;
             return Ok(());
         }
         Some(EditOperation::Append) => {
@@ -255,9 +250,9 @@ pub async fn config<D: State<GuildConfig<impl ConfigDataT>>>(
     let new_root = ctx.data().state().with(|cfg| to_yaml_value(cfg)).await?;
     let new_root_str = to_yaml_string(&new_root)?;
     let diff = diff(&root_str, &new_root_str);
-    let (content, files) = code_block_or_file(format!("✏️ Wrote `{path}`:"), &diff, CONFIG_NAME, "diff");
-
-    CreateReply::new().content(content).attachments(files).followup_to_modal(ctx.serenity_context(), &int).await?;
+    code_block_or_file(format!("✏️ Wrote `{path}`:"), &diff, CONFIG_NAME, "diff")
+        .followup_to_modal(ctx.serenity_context(), &int)
+        .await?;
 
     Ok(())
 }
@@ -316,14 +311,10 @@ pub async fn restore<D: State<GuildConfig<impl ConfigDataT>>>(ctx: CmdContext<'_
     let old_str = to_yaml_string(&old)?;
 
     let diff = diff(&old_str, &new_str);
-    let (content, files) = code_block_or_file("✏️ Restored:".to_string(), &diff, CONFIG_NAME, "diff");
-
-    let reply = CreateReply::new().content(content).attachments(
-        files
-            .into_iter()
-            .chain(iter::once(CreateAttachment::bytes(old_str.as_bytes(), format!("old_{CONFIG_NAME}.{CONFIG_EXT}")))),
-    );
-    ctx.send(reply).await?;
+    code_block_or_file("✏️ Restored:".to_string(), &diff, CONFIG_NAME, "diff")
+        .attachment(CreateAttachment::bytes(old_str.as_bytes(), format!("old_{CONFIG_NAME}.{CONFIG_EXT}")))
+        .create_message(ctx, ctx.channel_id())
+        .await?;
 
     Ok(())
 }

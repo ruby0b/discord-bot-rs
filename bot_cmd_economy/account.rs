@@ -1,11 +1,10 @@
 use crate::{ACCOUNT_BUTTON_ID, ConfigT, Currency, DailyIncome, TABLE_SELECT_ID};
-use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt as _;
+use bot_core::msg::Msg;
 use bot_core::{CmdContext, EvtContext, With, avatar_url};
 use chrono::{DateTime, Datelike, Local, TimeZone};
 use eyre::{OptionExt, Result};
 use itertools::Itertools;
-use poise::CreateReply;
 use poise::serenity_prelude::{
     ButtonStyle, ChannelType, Colour, ComponentInteraction, ComponentInteractionDataKind, CreateActionRow,
     CreateButton, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption, Member,
@@ -22,16 +21,15 @@ pub async fn account<D: With<ConfigT>>(ctx: CmdContext<'_, D>, user: Option<Memb
         CreateButton::new(ACCOUNT_BUTTON_ID).style(ButtonStyle::Primary).label("/account"),
     ]));
 
-    ctx.send(reply.components(components)).await?;
+    ctx.send(reply.components(components).to_reply()).await?;
 
     Ok(())
 }
 
 pub async fn btn_account(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
-    let (reply, components) = account_reply(ctx.user_data, component.member.as_ref().some()?, None).await?;
+    let (msg, components) = account_reply(ctx.user_data, component.member.as_ref().some()?, None).await?;
 
-    reply
-        .components(components)
+    msg.components(components)
         .ephemeral(component.channel.as_ref().is_some_and(|c| c.kind != ChannelType::Voice))
         .respond_to_component(ctx.serenity_context, component)
         .await?;
@@ -49,7 +47,7 @@ pub async fn btn_table_select(ctx: EvtContext<'_, impl With<ConfigT>>, component
     let table =
         ctx.user_data.with(|cfg| cfg.gambling_tables.get(&table_id).cloned().ok_or_eyre("Table doesn't exist")).await?;
 
-    table.reply(&cur, table_id).respond_to_component(ctx.serenity_context, component).await?;
+    table.msg(&cur, table_id).respond_to_component(ctx.serenity_context, component).await?;
 
     Ok(())
 }
@@ -58,7 +56,7 @@ async fn account_reply(
     data: &impl With<ConfigT>,
     author: &Member,
     member: Option<Member>,
-) -> Result<(CreateReply, Vec<CreateActionRow>)> {
+) -> Result<(Msg, Vec<CreateActionRow>)> {
     let member = member.as_ref().unwrap_or(author);
 
     let cur = Currency::read(data).await?;
@@ -125,7 +123,7 @@ async fn account_reply(
         ))
     }
 
-    Ok((CreateReply::new().embed(embed), components))
+    Ok((Msg::new().embed(embed), components))
 }
 
 fn rewarded_days<TZ: TimeZone>(income: &DailyIncome, last_claim: Option<DateTime<TZ>>, now: DateTime<TZ>) -> u32 {

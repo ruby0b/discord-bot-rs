@@ -1,10 +1,10 @@
 use crate::{ConfigT, DELETE_BUTTON_ID, SELECT_BEDTIME_ID, TOGGLE_WEEKDAY_BUTTON_ID};
 use bot_core::With;
+use bot_core::msg::Msg;
 use bot_core::time::iso_weekday::IsoWeekday;
 use chrono::{DateTime, Datelike, Days, Local, TimeDelta, TimeZone, Utc, Weekday};
 use eyre::Result;
 use itertools::Itertools as _;
-use poise::CreateReply;
 use poise::serenity_prelude::{
     ButtonStyle, Color, CreateActionRow, CreateButton, CreateEmbed, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption, ReactionType, UserId,
@@ -36,8 +36,8 @@ impl Bedtime {
         self.currently_relevant_bedtimes(now).into_iter().find(|&bedtime| bedtime > now).unwrap_or(self.first)
     }
 
-    pub(crate) async fn reply(&self, id: Uuid, data: &impl With<ConfigT>, now: DateTime<Utc>) -> Result<CreateReply> {
-        Ok(CreateReply::new().embed(self.embed(now)).components(self.components(id, data, now).await?))
+    pub(crate) async fn msg(&self, id: Uuid, data: &impl With<ConfigT>, now: DateTime<Utc>) -> Result<Msg> {
+        Ok(Msg::new().embed(self.embed(now)).components(self.components(id, data, now).await?))
     }
 
     pub(crate) fn embed(&self, now: DateTime<Utc>) -> CreateEmbed {

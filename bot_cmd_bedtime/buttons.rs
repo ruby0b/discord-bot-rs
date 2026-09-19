@@ -1,11 +1,10 @@
 use crate::ConfigT;
-use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt as _;
+use bot_core::msg::Msg;
 use bot_core::time::iso_weekday::IsoWeekday;
 use bot_core::{EvtContext, With};
 use chrono::{Utc, Weekday};
 use eyre::{OptionExt, Result, ensure};
-use poise::CreateReply;
 use poise::serenity_prelude::{Color, ComponentInteraction, ComponentInteractionDataKind};
 use uuid::Uuid;
 
@@ -33,7 +32,7 @@ pub async fn btn_toggle_weekday_button(
         })
         .await?;
 
-    bedtime.reply(id, ctx.user_data, Utc::now()).await?.edit_message(ctx.serenity_context, &component.message).await?;
+    bedtime.msg(id, ctx.user_data, Utc::now()).await?.edit_message(ctx.serenity_context, &component.message).await?;
 
     Ok(())
 }
@@ -59,7 +58,7 @@ pub async fn btn_delete(
         .await?;
 
     let now = Utc::now();
-    CreateReply::new()
+    Msg::new()
         .embed(bedtime.embed(now).color(Color::DARKER_GREY))
         .components(bedtime.select_menu_component(id, ctx.user_data, now).await?)
         .edit_message(ctx.serenity_context, &component.message)
@@ -89,7 +88,7 @@ pub async fn btn_select_bedtime(
         })
         .await?;
 
-    bedtime.reply(id, ctx.user_data, Utc::now()).await?.edit_message(ctx.serenity_context, &component.message).await?;
+    bedtime.msg(id, ctx.user_data, Utc::now()).await?.edit_message(ctx.serenity_context, &component.message).await?;
 
     Ok(())
 }

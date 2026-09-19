@@ -6,7 +6,6 @@ pub mod choice_parameters;
 pub mod color_parameter;
 pub mod roles;
 pub mod ext {
-    pub mod create_reply;
     pub mod option;
     pub mod result;
     pub mod set;
@@ -14,12 +13,14 @@ pub mod ext {
 pub mod hash_store;
 pub mod interval_set;
 pub mod lock_set;
+pub mod msg;
 pub mod serde;
 pub mod template;
 pub mod time;
 pub mod voice_change;
 
 use crate::ext::option::OptionExt as _;
+use crate::msg::Msg;
 use chrono::{DateTime, Local, NaiveDateTime, NaiveTime, TimeZone as _, Utc};
 use eyre::Result;
 use poise::serenity_prelude::{
@@ -94,12 +95,7 @@ pub fn naive_time_to_next_datetime(naive_time: NaiveTime) -> Option<DateTime<Loc
     Local.from_local_datetime(&NaiveDateTime::new(date, naive_time)).single()
 }
 
-pub fn code_block_or_file(
-    description: impl Into<String>,
-    code: &str,
-    filestem: &str,
-    extension: &str,
-) -> (String, Vec<CreateAttachment>) {
+pub fn code_block_or_file(description: impl Into<String>, code: &str, filestem: &str, extension: &str) -> Msg {
     let description = description.into();
     let code_bytes: Vec<u8> = code.into();
 
@@ -107,9 +103,9 @@ pub fn code_block_or_file(
     // Triple backticks would end the code block early, so we can't allow them in the code.
     if code_bytes.len() + description.len() > 1980 || code.contains("```") {
         let attachment = CreateAttachment::bytes(code_bytes.to_vec(), format!("{filestem}.{extension}"));
-        (description, vec![attachment])
+        Msg::new().content(description).attachment(attachment)
     } else {
         let code = String::from_utf8_lossy(&code_bytes);
-        (format!("{description}\n```{extension}\n{code}\n```"), vec![])
+        Msg::new().content(format!("{description}\n```{extension}\n{code}\n```"))
     }
 }

@@ -1,9 +1,8 @@
-use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt as _;
+use bot_core::msg::Msg;
 use bot_core::{EvtContext, UserData, With};
 use eyre::{Context as _, OptionExt as _, Result, bail, ensure};
 use itertools::Itertools;
-use poise::CreateReply;
 use poise::serenity_prelude::{
     ComponentInteraction, ComponentInteractionDataKind, CreateActionRow, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption, ReactionType, RoleId,
@@ -61,7 +60,7 @@ pub async fn btn_show_role_selection(
     };
 
     let max_values = options.len() as u8;
-    CreateReply::new()
+    Msg::new()
         .components(vec![CreateActionRow::SelectMenu(
             CreateSelectMenu::new(format!("{SELECT_ID}:{role_set_id}"), CreateSelectMenuKind::String { options })
                 .min_values(0)

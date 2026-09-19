@@ -1,10 +1,9 @@
 use crate::{ConfigT, Currency, GamblingTable, StateT};
-use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt as _;
+use bot_core::msg::Msg;
 use bot_core::{EvtContext, State, With, deferred_message, to_snd};
 use eyre::{OptionExt, Result, ensure};
 use itertools::Itertools;
-use poise::CreateReply;
 use poise::serenity_prelude::{
     ButtonStyle, Cache, Colour, ComponentInteraction, CreateActionRow, CreateButton, CreateEmbed, CreateInputText,
     CreateQuickModal, InputTextStyle, Mentionable as _, Message, ModalInteraction, QuickModalResponse, UserId,
@@ -155,7 +154,7 @@ async fn payout_confirm(
     let confirm_id = "~economy.confirm";
     let cancel_id = "~economy.cancel";
 
-    let message = CreateReply::new()
+    let message = Msg::new()
         .embed(embed.clone())
         .components(vec![CreateActionRow::Buttons(vec![
             CreateButton::new(confirm_id).label("Confirm").style(ButtonStyle::Success),
@@ -177,7 +176,7 @@ async fn payout_confirm(
     .await;
 
     // deactivate confirmation message in all cases
-    CreateReply::new()
+    Msg::new()
         .embed(embed.clone().colour(Colour::DARKER_GREY))
         .components(vec![])
         .edit_message(ctx.serenity_context, &message)
@@ -189,13 +188,13 @@ async fn payout_confirm(
 
     let table = ctx.user_data.with_mut(|cfg| apply_payout(cfg, table_id, payouts)).await?;
 
-    CreateReply::new()
+    Msg::new()
         .components(vec![])
         .embed(embed.colour(Colour::DARK_GREEN))
         .edit_message(ctx.serenity_context, &message)
         .await?;
 
-    if table.pot == 0 { table.deactivated_reply(cur) } else { table.reply(cur, table_id) }
+    if table.pot == 0 { table.deactivated_msg(cur) } else { table.msg(cur, table_id) }
         .edit_message(ctx.serenity_context, table_message)
         .await?;
 

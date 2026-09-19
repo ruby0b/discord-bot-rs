@@ -1,9 +1,9 @@
 mod sandbox;
 
 use crate::sandbox::run_in_sandbox;
+use bot_core::msg::Msg;
 use bot_core::{CmdContext, UserData};
 use eyre::Result;
-use poise::CreateReply;
 use poise::serenity_prelude::CreateAttachment;
 
 static PRELUDE: &str = r#"
@@ -17,7 +17,7 @@ pub async fn typst<D: UserData>(ctx: CmdContext<'_, D>, #[description = "typst c
     let args = ["compile", "--format=png", "-", "-"];
     let stdin = format!("{PRELUDE}\n{code}");
     let png = run_in_sandbox("typst", &args, stdin.as_bytes()).await?;
-    ctx.send(CreateReply::new().attachment(CreateAttachment::bytes(png, "typst.png"))).await?;
+    ctx.send(Msg::new().attachment(CreateAttachment::bytes(png, "typst.png")).to_reply()).await?;
     Ok(())
 }
 
@@ -28,6 +28,6 @@ pub async fn math<D: UserData>(ctx: CmdContext<'_, D>, #[description = "typst ma
     let args = ["compile", "--format=png", "-", "-"];
     let stdin = format!("{PRELUDE}\n$ {code} $");
     let png = run_in_sandbox("typst", &args, stdin.as_bytes()).await?;
-    ctx.send(CreateReply::new().attachment(CreateAttachment::bytes(png, "typst.png"))).await?;
+    ctx.send(Msg::new().attachment(CreateAttachment::bytes(png, "typst.png")).to_reply()).await?;
     Ok(())
 }

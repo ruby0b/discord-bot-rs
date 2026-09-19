@@ -36,7 +36,7 @@ pub async fn bedtime<D: With<ConfigT>>(
         })
         .await?;
 
-    ctx.send(bedtime.reply(id, ctx.data(), Utc::now()).await?).await?;
+    ctx.send(bedtime.msg(id, ctx.data(), Utc::now()).await?.to_reply()).await?;
 
     Ok(())
 }
@@ -57,7 +57,7 @@ pub async fn bedtimes<D: With<ConfigT>>(ctx: CmdContext<'_, D>) -> Result<()> {
         .await?
         .ok_or_eyre("You have no bedtimes.")?;
 
-    ctx.send(next_bedtime.reply(next_id, ctx.data(), now).await?).await?;
+    ctx.send(next_bedtime.msg(next_id, ctx.data(), now).await?.to_reply()).await?;
 
     Ok(())
 }

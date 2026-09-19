@@ -11,9 +11,9 @@ pub use crate::leaderboard::*;
 pub use crate::pay_out::*;
 use bot_core::With;
 use bot_core::lock_set::LockSet;
+use bot_core::msg::Msg;
 use chrono::{DateTime, Utc};
 use eyre::Result;
-use poise::CreateReply;
 use poise::serenity_prelude::{
     ButtonStyle, Colour, CreateActionRow, CreateButton, CreateEmbed, Mentionable as _, UserId,
 };
@@ -120,11 +120,11 @@ impl GamblingTable {
         vec![CreateActionRow::Buttons(vec![buyin_button, payout_button, payout_player_button])]
     }
 
-    fn reply(&self, cur: &Currency, id: Uuid) -> CreateReply {
-        CreateReply::new().embed(self.embed(cur)).components(self.components(id))
+    fn msg(&self, cur: &Currency, id: Uuid) -> Msg {
+        Msg::new().embed(self.embed(cur)).components(self.components(id))
     }
 
-    fn deactivated_reply(&self, cur: &Currency) -> CreateReply {
-        CreateReply::new().embed(self.embed(cur).colour(Colour::DARKER_GREY)).components(vec![])
+    fn deactivated_msg(&self, cur: &Currency) -> Msg {
+        Msg::new().embed(self.embed(cur).colour(Colour::DARKER_GREY)).components(vec![])
     }
 }

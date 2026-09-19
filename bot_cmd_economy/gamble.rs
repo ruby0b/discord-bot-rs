@@ -28,11 +28,11 @@ pub async fn gamble<D: With<ConfigT>>(
         pot: 0,
     };
 
-    let reply = table.reply(&cur, id);
+    let msg = table.msg(&cur, id);
 
     ctx.data().with_mut_ok(|cfg| cfg.gambling_tables.insert(id, table)).await?;
 
-    ctx.send(reply).await?;
+    ctx.send(msg.to_reply()).await?;
 
     Ok(())
 }

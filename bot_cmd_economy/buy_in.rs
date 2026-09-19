@@ -20,12 +20,7 @@ pub async fn btn_buyin(
 
     let table = ctx.user_data.with_mut(|cfg| buy_in(cfg, &cur, table_id, user_id)).await?;
 
-    component
-        .edit_response(
-            ctx.serenity_context,
-            table.reply(&cur, table_id).to_slash_initial_response_edit(Default::default()),
-        )
-        .await?;
+    table.msg(&cur, table_id).edit_initial_component_response(ctx.serenity_context, component).await?;
 
     Ok(())
 }

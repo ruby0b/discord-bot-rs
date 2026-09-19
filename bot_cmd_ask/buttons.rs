@@ -4,15 +4,14 @@ use crate::{
     ConfigT, Game, JOIN_ADVANCED_SUBMIT_BUTTON_ID, LEAVE_SERVER_BUTTON_ID, SHOW_GAME_ROLES_SELECT_ID,
     SUBMIT_GAME_ROLES_SELECT_ID, StateT, worker_ask_update, worker_game_roles,
 };
-use bot_core::ext::create_reply::CreateReplyExt;
 use bot_core::ext::option::OptionExt;
 use bot_core::ext::set::{BTreeSetExt, ToggleResult};
+use bot_core::msg::Msg;
 use bot_core::{EvtContext, State, With};
 use chrono::TimeDelta;
 use chrono::prelude::{DateTime, Utc};
 use eyre::{Context, OptionExt as _, Result, bail, ensure};
 use itertools::Itertools as _;
-use poise::CreateReply;
 use poise::serenity_prelude::prelude::Mentionable;
 use poise::serenity_prelude::{
     ButtonStyle, Colour, ComponentInteraction, ComponentInteractionDataKind, CreateActionRow, CreateButton,
@@ -71,7 +70,7 @@ pub async fn btn_join_advanced(
             .label("+2 hours")
             .style(ButtonStyle::Primary),
     ]);
-    CreateReply::new()
+    Msg::new()
         .ephemeral(true)
         .components(vec![action_row])
         .respond_to_component(ctx.serenity_context, interaction)
@@ -106,7 +105,7 @@ pub async fn button_pressed(
     interaction.defer(ctx.serenity_context).await?;
 
     let user_id = interaction.user.id;
-    let reply = ctx
+    let msg = ctx
         .user_data
         .with_mut(|cfg| {
             let ask = cfg.asks.get_mut(&ask_id).ok_or_eyre("Unknown /ask")?;
@@ -117,7 +116,7 @@ pub async fn button_pressed(
                 }
                 AskEvent::Leave => {
                     if !ask.players.contains_key(&user_id) {
-                        Some(leave_server_reply())
+                        Some(leave_server_msg())
                     } else {
                         ask.players.retain(|&x, _| x != user_id);
                         None
@@ -129,7 +128,7 @@ pub async fn button_pressed(
                         None
                     }
                     btree_map::Entry::Occupied(mut entry) => match entry.get().state {
-                        AskPlayerState::Declined => Some(leave_server_reply()),
+                        AskPlayerState::Declined => Some(leave_server_msg()),
                         AskPlayerState::Joined => {
                             entry.insert(AskPlayer { entered_at: Utc::now(), state: AskPlayerState::Declined });
                             None
@@ -140,8 +139,8 @@ pub async fn button_pressed(
         })
         .await?;
 
-    if let Some(reply) = reply {
-        reply.followup_to_component(ctx.serenity_context, interaction).await?;
+    if let Some(msg) = msg {
+        msg.followup_to_component(ctx.serenity_context, interaction).await?;
     }
 
     ctx.user_data.state().ask_update_sender.get().some()?.send(worker_ask_update::Command::Update(ask_id)).await?;
@@ -149,12 +148,10 @@ pub async fn button_pressed(
     Ok(())
 }
 
-fn leave_server_reply() -> CreateReply {
-    CreateReply::new().ephemeral(true).content("Press again to leave the server").components(vec![
-        CreateActionRow::Buttons(vec![
-            CreateButton::new(LEAVE_SERVER_BUTTON_ID).label("Leave Server").style(ButtonStyle::Danger),
-        ]),
-    ])
+fn leave_server_msg() -> Msg {
+    Msg::new().ephemeral(true).content("Press again to leave the server").components(vec![CreateActionRow::Buttons(
+        vec![CreateButton::new(LEAVE_SERVER_BUTTON_ID).label("Leave Server").style(ButtonStyle::Danger)],
+    )])
 }
 
 pub async fn btn_leave_server(ctx: EvtContext<'_, impl With<ConfigT>>, component: &ComponentInteraction) -> Result<()> {
@@ -188,7 +185,7 @@ pub async fn btn_toggle_game_role(
         })
         .await?;
 
-    CreateReply::new()
+    Msg::new()
         .embed(CreateEmbed::new().colour(Colour::GOLD).description(response))
         .ephemeral(true)
         .followup_to_component(ctx.serenity_context, component)
@@ -231,11 +228,7 @@ pub async fn btn_show_parent_role_buttons(
             .collect_vec()
     };
 
-    CreateReply::new()
-        .components(components)
-        .ephemeral(true)
-        .respond_to_component(ctx.serenity_context, interaction)
-        .await?;
+    Msg::new().components(components).ephemeral(true).respond_to_component(ctx.serenity_context, interaction).await?;
 
     Ok(())
 }
@@ -280,7 +273,7 @@ pub async fn btn_show_game_role_selection(
     };
 
     let max_values = options.len() as u8;
-    CreateReply::new()
+    Msg::new()
         .components(vec![CreateActionRow::SelectMenu(
             CreateSelectMenu::new(
                 format!("{SUBMIT_GAME_ROLES_SELECT_ID}:{parent_role}"),

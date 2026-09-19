@@ -1,11 +1,11 @@
 use crate::{ConfigT, Game, GameDefaults, StateT, worker_game_roles};
 use bot_core::ext::option::OptionExt as _;
+use bot_core::msg::Msg;
 use bot_core::serde::LiteralRegex;
 use bot_core::{CmdContext, State, With};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use fancy_regex::Regex;
 use itertools::Itertools;
-use poise::CreateReply;
 use poise::serenity_prelude::{EditRole, Guild, Mentionable, Permissions, RoleId};
 use url::Url;
 
@@ -82,7 +82,7 @@ pub async fn configure_ask_game<D: With<ConfigT> + State<StateT>>(
 
     ctx.data().with_mut_ok(|cfg| cfg.games.insert(role_id, game)).await?;
 
-    ctx.send(CreateReply::new().content(format!("📝 Game configured with role {}", role_id.mention()))).await?;
+    ctx.send(Msg::new().content(format!("📝 Game configured with role {}", role_id.mention())).to_reply()).await?;
 
     ctx.data().state().game_role_sender.get().some()?.send(worker_game_roles::Command::Update).await?;
 
