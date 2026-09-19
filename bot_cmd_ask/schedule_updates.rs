@@ -132,31 +132,17 @@ async fn search_image(query: &str, serpapi_token: &str) -> Result<Option<String>
 
 /// Fetch a description for the game
 async fn fetch_game_description(data: &impl With<ConfigT>, msg_id: MessageId) -> Result<()> {
-    let description = {
-        let Some(ask) = data.with_ok(|cfg| cfg.asks.get(&msg_id).cloned()).await? else {
-            return Ok(());
-        };
-        if ask.description.is_some() {
-            return Ok(());
-        }
-        let mut description = match &ask.url {
-            Some(url) => {
-                tracing::debug!("fetching game description from {}", url);
-                let html = reqwest::get(url.as_str()).await?.text().await?;
-                let dom = tl::parse(&html, tl::ParserOptions::default())?;
-                dom.get_elements_by_class_name("game_description_snippet")
-                    .next()
-                    .ok_or_eyre(format!("No game description on {url}"))?
-                    .get(dom.parser())
-                    .expect("tl error")
-                    .inner_text(dom.parser())
-                    .to_string()
-            }
-            None => return Ok(()),
-        };
-        description.truncate(1024);
-        description
+    let Some(ask) = data.with_ok(|cfg| cfg.asks.get(&msg_id).cloned()).await? else {
+        return Ok(());
     };
+    if ask.description.is_some() {
+        return Ok(());
+    }
+    let Some(url) = ask.url else {
+        return Ok(());
+    };
+
+    let description = crate::fetch_description(&url).await?;
 
     data.with_mut_ok(|cfg| {
         let Some(ask) = cfg.asks.get_mut(&msg_id) else { return };

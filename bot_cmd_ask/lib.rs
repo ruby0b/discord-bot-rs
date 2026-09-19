@@ -19,9 +19,9 @@ use crate::schedule_updates::schedule_ask_updates;
 use bot_core::serde::LiteralRegex;
 use bot_core::{State, With};
 use chrono::TimeDelta;
-use eyre::{Result, bail};
+use eyre::{OptionExt as _, Result, bail};
 use itertools::Itertools as _;
-use poise::serenity_prelude::{Context, Guild, GuildId, MessageId, RoleId, UserId};
+use poise::serenity_prelude::{Context, Guild, GuildId, MessageId, Role, RoleId, UserId};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use tokio::sync::{OnceCell, mpsc};
@@ -108,4 +108,24 @@ pub(crate) fn get_unique_role_by_name(guild: &Guild, name: &str) -> Result<Optio
         bail!("Multiple roles with that name exist, please make sure that game role names are unique!")
     }
     Ok(role_ids.first().copied())
+}
+
+pub(crate) async fn fetch_description(url: &url::Url) -> Result<String> {
+    tracing::debug!("fetching game description from {}", url);
+    let html = reqwest::get(url.as_str()).await?.text().await?;
+    let dom = tl::parse(&html, tl::ParserOptions::default())?;
+    let mut description = dom
+        .get_elements_by_class_name("game_description_snippet")
+        .next()
+        .ok_or_eyre(format!("No game description on {url}"))?
+        .get(dom.parser())
+        .expect("tl error")
+        .inner_text(dom.parser())
+        .to_string();
+    description.truncate(1024);
+    Ok(description)
+}
+
+pub(crate) fn game_roles(cfg: &ConfigT, guild: &Guild) -> impl IntoIterator<Item = Role> {
+    cfg.games.keys().filter_map(|&role_id| guild.roles.get(&role_id).cloned())
 }

@@ -4,7 +4,7 @@ use bot_core::ext::option::OptionExt as _;
 use itertools::Itertools;
 use poise::serenity_prelude::{AutocompleteChoice, CreateAutocompleteResponse};
 
-pub async fn existing_game_name<U, E>(ctx: poise::Context<'_, U, E>, input: &str) -> CreateAutocompleteResponse
+pub(crate) async fn existing_game_name<U, E>(ctx: poise::Context<'_, U, E>, input: &str) -> CreateAutocompleteResponse
 where
     U: With<ConfigT>,
 {
@@ -13,10 +13,13 @@ where
             .data()
             .with(|c| {
                 let guild = ctx.guild().some()?;
-                Ok(c.games
-                    .keys()
-                    .filter_map(|&role_id| guild.roles.get(&role_id).map(|r| r.name.clone()))
-                    .filter(|name| name.to_lowercase().trim().starts_with(input))
+                Ok(crate::game_roles(c, &guild)
+                    .into_iter()
+                    .filter(|role| {
+                        role.name.to_lowercase().trim().starts_with(input)
+                            || c.games.get(&role.id).unwrap().title_pattern.0.is_match(&input).is_ok_and(|x| x)
+                    })
+                    .map(|role| role.name)
                     .map(|name| AutocompleteChoice::new(name.clone(), name))
                     .take(25)
                     .collect_vec())

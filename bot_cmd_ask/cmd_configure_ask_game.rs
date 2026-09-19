@@ -2,9 +2,11 @@ use crate::{ConfigT, Game, GameDefaults, StateT, worker_game_roles};
 use bot_core::ext::option::OptionExt as _;
 use bot_core::serde::LiteralRegex;
 use bot_core::{CmdContext, State, With};
-use eyre::{OptionExt as _, Result, WrapErr as _};
+use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use fancy_regex::Regex;
-use poise::serenity_prelude::{EditRole, Mentionable, Permissions, RoleId};
+use itertools::Itertools;
+use poise::CreateReply;
+use poise::serenity_prelude::{EditRole, Guild, Mentionable, Permissions, RoleId};
 use url::Url;
 
 /// Edit game-specific /ask ping and defaults
@@ -28,51 +30,70 @@ pub async fn configure_ask_game<D: With<ConfigT> + State<StateT>>(
 
     ctx.defer().await?;
 
-    let existing_game_role_id = if let Some(id) = {
-        let guild = ctx.guild().some()?;
-        crate::get_unique_role_by_name(&guild, name.trim())?
-    } && ctx.data().with_ok(|cfg| cfg.games.contains_key(&id)).await?
-    {
-        Some(id)
-    } else {
-        None
-    };
-
-    let pattern = title_pattern.as_ref().unwrap_or(&name);
-    let title_pattern = Regex::new(&format!("(?i){pattern}")).wrap_err("Invalid regex")?;
-
-    let role_builder = {
-        let guild = ctx.guild().some()?;
-        let builder = EditRole::new().name(name.clone()).permissions(Permissions::empty());
-        let parent_role = guild.roles.get(&parent_role).ok_or_eyre("Parent role not found")?;
-        builder
-            .colour(parent_role.colour)
-            .mentionable(parent_role.mentionable)
-            .audit_log_reason("Created game role from parent role")
-    };
-
-    let role_id = match existing_game_role_id {
-        Some(id) => id,
-        None => guild_id.create_role(ctx, role_builder).await?.id,
-    };
-
-    ctx.data()
-        .with_mut_ok(|cfg| {
-            cfg.games.insert(
-                role_id,
-                Game {
-                    parent_role,
-                    title_pattern: LiteralRegex(title_pattern),
-                    defaults: GameDefaults { min_players, max_players, url, description, thumbnail_url },
-                    opted_out_users: Default::default(),
-                },
-            );
+    let game_roles = ctx
+        .data()
+        .with(|cfg| {
+            let guild = ctx.guild().some()?;
+            Ok(crate::game_roles(cfg, &guild).into_iter().collect_vec())
         })
         .await?;
 
-    ctx.say(format!("📝 Ask defaults updated, created role {}", role_id.mention())).await?;
+    let title_pattern = title_pattern.as_ref().unwrap_or(&name);
+    let title_pattern = Regex::new(&format!("(?i){title_pattern}")).wrap_err("Invalid regex")?;
+
+    ensure!(title_pattern.is_match(&name)?, "Pattern has to match the game name");
+
+    let existing_games_matched = game_roles
+        .iter()
+        .filter(|r| r.name != name)
+        .filter(|r| title_pattern.is_match(&r.name).is_ok_and(|x| x))
+        .collect_vec();
+    ensure!(
+        existing_games_matched.is_empty(),
+        "Pattern can't match existing game names: {}",
+        existing_games_matched.iter().map(|r| r.mention()).join(" ")
+    );
+
+    let role_id = if let Some(id) = {
+        let guild = ctx.guild().some()?;
+        crate::get_unique_role_by_name(&guild, name.trim())?
+    } {
+        id
+    } else {
+        let role_builder = {
+            let guild = ctx.guild().some()?;
+            build_child_role(&guild, name, parent_role)?
+        };
+        guild_id.create_role(ctx, role_builder).await?.id
+    };
+
+    let description = match (description, &url) {
+        (Some(description), _) => Some(description),
+        (None, Some(url)) => Some(crate::fetch_description(url).await?),
+        (None, None) => None,
+    };
+
+    let game = Game {
+        parent_role,
+        title_pattern: LiteralRegex(title_pattern),
+        defaults: GameDefaults { min_players, max_players, url, description, thumbnail_url },
+        opted_out_users: Default::default(),
+    };
+
+    ctx.data().with_mut_ok(|cfg| cfg.games.insert(role_id, game)).await?;
+
+    ctx.send(CreateReply::new().content(format!("📝 Game configured with role {}", role_id.mention()))).await?;
 
     ctx.data().state().game_role_sender.get().some()?.send(worker_game_roles::Command::Update).await?;
 
     Ok(())
+}
+
+fn build_child_role(guild: &Guild, name: String, parent: RoleId) -> Result<EditRole<'static>> {
+    let builder = EditRole::new().name(name.clone()).permissions(Permissions::empty());
+    let parent = guild.roles.get(&parent).ok_or_eyre("Parent role not found")?;
+    Ok(builder
+        .colour(parent.colour)
+        .mentionable(parent.mentionable)
+        .audit_log_reason("Created game role from parent role"))
 }

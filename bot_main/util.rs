@@ -1,31 +1,10 @@
 use imara_diff::{BasicLineDiffPrinter, Diff, InternedInput, UnifiedDiffConfig};
-use poise::serenity_prelude::CreateAttachment;
 
 pub fn diff(before: &str, after: &str) -> String {
     let input = InternedInput::new(before, after);
     let mut diff = Diff::compute(imara_diff::Algorithm::Histogram, &input);
     diff.postprocess_lines(&input);
     diff.unified_diff(&BasicLineDiffPrinter(&input.interner), UnifiedDiffConfig::default(), &input).to_string()
-}
-
-pub fn code_block_or_file(
-    description: impl Into<String>,
-    code: &str,
-    filestem: &str,
-    extension: &str,
-) -> (String, Vec<CreateAttachment>) {
-    let description = description.into();
-    let code_bytes: Vec<u8> = code.into();
-
-    // Character limit is 2000 (bytes? glyphs?) minus the backticks and extension, we'll play it safe.
-    // Triple backticks would end the code block early, so we can't allow them in the code.
-    if code_bytes.len() + description.len() > 1980 || code.contains("```") {
-        let attachment = CreateAttachment::bytes(code_bytes.to_vec(), format!("{filestem}.{extension}"));
-        (description, vec![attachment])
-    } else {
-        let code = String::from_utf8_lossy(&code_bytes);
-        (format!("{description}\n```{extension}\n{code}\n```"), vec![])
-    }
 }
 
 #[cfg(test)]

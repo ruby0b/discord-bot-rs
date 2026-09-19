@@ -23,7 +23,8 @@ use crate::ext::option::OptionExt as _;
 use chrono::{DateTime, Local, NaiveDateTime, NaiveTime, TimeZone as _, Utc};
 use eyre::Result;
 use poise::serenity_prelude::{
-    Builder as _, Cache, Context, CreateInteractionResponse, GuildId, Member, ModalInteraction, UserId,
+    Builder as _, Cache, Context, CreateAttachment, CreateInteractionResponse, GuildId, Member, ModalInteraction,
+    UserId,
 };
 use std::sync::Arc;
 
@@ -91,4 +92,24 @@ pub fn naive_time_to_next_datetime(naive_time: NaiveTime) -> Option<DateTime<Loc
     let now = Utc::now().naive_local();
     let date = if naive_time > now.time() { now.date() } else { now.date().succ_opt().unwrap() };
     Local.from_local_datetime(&NaiveDateTime::new(date, naive_time)).single()
+}
+
+pub fn code_block_or_file(
+    description: impl Into<String>,
+    code: &str,
+    filestem: &str,
+    extension: &str,
+) -> (String, Vec<CreateAttachment>) {
+    let description = description.into();
+    let code_bytes: Vec<u8> = code.into();
+
+    // Character limit is 2000 (bytes? glyphs?) minus the backticks and extension, we'll play it safe.
+    // Triple backticks would end the code block early, so we can't allow them in the code.
+    if code_bytes.len() + description.len() > 1980 || code.contains("```") {
+        let attachment = CreateAttachment::bytes(code_bytes.to_vec(), format!("{filestem}.{extension}"));
+        (description, vec![attachment])
+    } else {
+        let code = String::from_utf8_lossy(&code_bytes);
+        (format!("{description}\n```{extension}\n{code}\n```"), vec![])
+    }
 }

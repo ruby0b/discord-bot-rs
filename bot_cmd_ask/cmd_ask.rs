@@ -12,7 +12,9 @@ use url::Url;
 #[poise::command(slash_command)]
 pub async fn ask<D: With<ConfigT> + State<StateT>>(
     ctx: CmdContext<'_, D>,
-    #[description = "Game title"] title: String,
+    #[autocomplete = crate::autocomplete::existing_game_name]
+    #[description = "Game title"]
+    title: String,
     #[description = "Minimum number of players"] min_players: Option<u32>,
     #[description = "Maximum number of players"] max_players: Option<u32>,
     #[string]

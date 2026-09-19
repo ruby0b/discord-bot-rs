@@ -1,8 +1,8 @@
 use crate::message_file::MessageFile;
-use crate::util::{code_block_or_file, diff};
+use crate::util::diff;
 use bot_core::ext::create_reply::CreateReplyExt as _;
 use bot_core::ext::option::OptionExt as _;
-use bot_core::{CmdContext, State, deferred_message};
+use bot_core::{CmdContext, State, code_block_or_file, deferred_message};
 use eyre::{OptionExt as _, Result, WrapErr as _, ensure};
 use poise::serenity_prelude::{
     Cache, CacheHttp, ChannelId, Context, CreateAttachment, CreateAutocompleteResponse, CreateInputText, CreateMessage,
