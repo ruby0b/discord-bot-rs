@@ -35,7 +35,7 @@ hex = "0.4.3"
 imara-diff = "0.2.0"
 itertools = "0.15.0"
 once_cell = "1.21.1"
-poise = { git = "https://github.com/serenity-rs/poise", rev = "303023a92609872add5c415fddbc1046289d77f4" }
+poise = "0.7"
 rand = "0.10.0"
 reqwest = { version = "0.13", features = ["json", "query", "rustls"] }
 rustls = "0.23"
