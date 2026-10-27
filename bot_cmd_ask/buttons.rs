@@ -179,8 +179,8 @@ pub async fn btn_toggle_game_role(
             };
             let game = cfg.games.get_mut(&game_role_id).ok_or_eyre("Unexpected: The game no longer exists.")?;
             Ok(match game.opted_out_users.toggle(user_id) {
-                ToggleResult::Inserted => format!("🔕 Unsubscribed from {game_role_id}"),
-                ToggleResult::Removed => format!("🔔 Subscribed to {game_role_id}"),
+                ToggleResult::Inserted => format!("🔕 Unsubscribed from {}", game_role_id.mention()),
+                ToggleResult::Removed => format!("🔔 Subscribed to {}", game_role_id.mention()),
             })
         })
         .await?;
